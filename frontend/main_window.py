@@ -1,89 +1,229 @@
-from pathlib import Path
+# ==============================================================
+# NETWORK TRAFFIC ANALYZER
+# MAIN WINDOW
+# ==============================================================
+#
+# This file controls the COMMON application UI.
+#
+# Responsibilities:
+#
+#   1. Main application window
+#   2. Common sidebar
+#   3. Dashboard / Overview / Inspection navigation
+#   4. Common header
+#   5. Common footer
+#   6. Network adapter list
+#   7. Page switching
+#
+# FRONTEND ONLY
+#
+# Backend services will be connected later.
+#
+# ==============================================================
 
-from PySide6.QtCore import Qt
+
+import os
+
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMainWindow,
+    QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from frontend.dashboard import DashboardPage
+from frontend.overview import OverviewPage
+from frontend.inspection import InspectionPage
 
 
-class MainWindow(QMainWindow):
+# ==============================================================
+# SIZE CONFIGURATION
+# ==============================================================
+#
+# You can easily change the UI size from here.
+#
+# ==============================================================
+
+
+# --------------------------------------------------------------
+# MAIN WINDOW
+# --------------------------------------------------------------
+
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 800
+
+MIN_WINDOW_WIDTH = 1050
+MIN_WINDOW_HEIGHT = 650
+
+
+# --------------------------------------------------------------
+# SIDEBAR
+# --------------------------------------------------------------
+
+SIDEBAR_WIDTH = 275
+
+
+# --------------------------------------------------------------
+# HEADER / FOOTER
+# --------------------------------------------------------------
+
+HEADER_HEIGHT = 52
+FOOTER_HEIGHT = 28
+
+
+# --------------------------------------------------------------
+# SIDEBAR TITLE
+# --------------------------------------------------------------
+
+SIDEBAR_TITLE_HEIGHT = 115
+
+
+# --------------------------------------------------------------
+# NAVIGATION BUTTONS
+# --------------------------------------------------------------
+
+NAV_BUTTON_HEIGHT = 42
+
+
+# --------------------------------------------------------------
+# NETWORK ADAPTER ITEMS
+# --------------------------------------------------------------
+
+# Height of each adapter item.
+#
+# Example:
+#
+# ○ Wi-Fi
+#   Intel(R) Wi-Fi 6 AX201 160MHz
+#
+# Each adapter gets 52 px.
+#
+ADAPTER_ITEM_HEIGHT = 52
+
+
+# Maximum description width.
+ADAPTER_DESCRIPTION_WIDTH = 205
+
+
+# Refresh button size.
+ADAPTER_REFRESH_SIZE = 22
+
+
+# ==============================================================
+# COLOR CONFIGURATION
+# ==============================================================
+
+
+COLOR_BACKGROUND = "#050B14"
+
+COLOR_SIDEBAR = "#07111F"
+
+COLOR_PANEL = "#0B1728"
+
+COLOR_BORDER = "#17324D"
+
+COLOR_BLUE = "#1683FF"
+
+COLOR_CYAN = "#00E5FF"
+
+COLOR_GREEN = "#00E676"
+
+COLOR_RED = "#FF3B4E"
+
+COLOR_TEXT = "#F1F5F9"
+
+COLOR_SECONDARY = "#94A3B8"
+
+COLOR_MUTED = "#64748B"
+
+
+# ==============================================================
+# MAIN WINDOW
+# ==============================================================
+
+
+class MainWindow(QWidget):
 
     def __init__(self):
+
         super().__init__()
+
+        # ------------------------------------------------------
+        # WINDOW TITLE
+        # ------------------------------------------------------
 
         self.setWindowTitle(
             "Network Traffic Analyzer"
         )
 
-        self.setMinimumSize(
-            1400,
-            850
+        # ------------------------------------------------------
+        # WINDOW SIZE
+        # ------------------------------------------------------
+
+        self.resize(
+            WINDOW_WIDTH,
+            WINDOW_HEIGHT
         )
 
-        self.load_theme()
+        # ------------------------------------------------------
+        # MINIMUM SIZE
+        # ------------------------------------------------------
+
+        self.setMinimumSize(
+            MIN_WINDOW_WIDTH,
+            MIN_WINDOW_HEIGHT
+        )
+
+        # ------------------------------------------------------
+        # OBJECT NAME
+        # ------------------------------------------------------
+
+        self.setObjectName(
+            "mainWindow"
+        )
+
+        # ------------------------------------------------------
+        # CURRENT ADAPTER
+        # ------------------------------------------------------
+
+        self.selected_adapter = None
+
+        # ------------------------------------------------------
+        # BUILD UI
+        # ------------------------------------------------------
+
         self.setup_ui()
 
-    # ==================================================
-    # LOAD THEME
-    # ==================================================
+        # ------------------------------------------------------
+        # LOAD COMMON THEME
+        # ------------------------------------------------------
 
-    def load_theme(self):
+        self.load_theme()
 
-        theme_path = (
-            Path(__file__).parent
-            / "styles"
-            / "theme.qss"
-        )
+        # ------------------------------------------------------
+        # OPEN DASHBOARD
+        # ------------------------------------------------------
 
-        if not theme_path.exists():
-            print(
-                "Theme file not found:",
-                theme_path
-            )
-            return
+        self.show_dashboard()
 
-        try:
-
-            with open(
-                theme_path,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
-                self.setStyleSheet(
-                    file.read()
-                )
-
-        except OSError as error:
-
-            print(
-                f"Unable to load theme: {error}"
-            )
-
-    # ==================================================
+    # ==========================================================
     # SETUP UI
-    # ==================================================
+    # ==========================================================
 
     def setup_ui(self):
 
-        central_widget = QWidget()
-
-        self.setCentralWidget(
-            central_widget
-        )
+        # ------------------------------------------------------
+        # MAIN HORIZONTAL LAYOUT
+        # ------------------------------------------------------
 
         main_layout = QHBoxLayout(
-            central_widget
+            self
         )
 
         main_layout.setContentsMargins(
@@ -93,34 +233,160 @@ class MainWindow(QMainWindow):
             0
         )
 
-        main_layout.setSpacing(0)
-
-        # Sidebar
-        sidebar = self.create_sidebar()
-
-        # Main content
-        content = self.create_content_area()
-
-        main_layout.addWidget(
-            sidebar
-        )
-
-        main_layout.addWidget(
-            content
-        )
-
-        # Navigation
-        self.navigation.currentRowChanged.connect(
-            self.change_page
-        )
-
-        self.navigation.setCurrentRow(
+        main_layout.setSpacing(
             0
         )
 
-    # ==================================================
-    # SIDEBAR
-    # ==================================================
+        # ------------------------------------------------------
+        # SIDEBAR
+        # ------------------------------------------------------
+
+        self.sidebar = (
+            self.create_sidebar()
+        )
+
+        main_layout.addWidget(
+            self.sidebar
+        )
+
+        # ------------------------------------------------------
+        # RIGHT CONTENT CONTAINER
+        # ------------------------------------------------------
+
+        right_container = QFrame()
+
+        right_container.setObjectName(
+            "rightContainer"
+        )
+
+        right_container.setStyleSheet(
+            f"""
+            QFrame#rightContainer {{
+                background-color: {COLOR_BACKGROUND};
+                border: none;
+            }}
+            """
+        )
+
+        right_layout = QVBoxLayout(
+            right_container
+        )
+
+        right_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        right_layout.setSpacing(
+            0
+        )
+
+        # ------------------------------------------------------
+        # HEADER
+        # ------------------------------------------------------
+
+        self.header = (
+            self.create_header()
+        )
+
+        right_layout.addWidget(
+            self.header
+        )
+
+        # ------------------------------------------------------
+        # PAGE STACK
+        # ------------------------------------------------------
+
+        self.stack = QStackedWidget()
+
+        self.stack.setObjectName(
+            "pageStack"
+        )
+
+        self.stack.setStyleSheet(
+            f"""
+            QStackedWidget#pageStack {{
+                background-color: {COLOR_BACKGROUND};
+                border: none;
+            }}
+            """
+        )
+
+        # ------------------------------------------------------
+        # DASHBOARD PAGE
+        # ------------------------------------------------------
+
+        self.dashboard_page = (
+            DashboardPage()
+        )
+
+        # ------------------------------------------------------
+        # OVERVIEW PAGE
+        # ------------------------------------------------------
+
+        self.overview_page = (
+            OverviewPage()
+        )
+
+        # ------------------------------------------------------
+        # INSPECTION PAGE
+        # ------------------------------------------------------
+
+        self.inspection_page = (
+            InspectionPage()
+        )
+
+        # ------------------------------------------------------
+        # ADD PAGES
+        # ------------------------------------------------------
+
+        self.stack.addWidget(
+            self.dashboard_page
+        )
+
+        self.stack.addWidget(
+            self.overview_page
+        )
+
+        self.stack.addWidget(
+            self.inspection_page
+        )
+
+        # ------------------------------------------------------
+        # ADD STACK TO RIGHT AREA
+        # ------------------------------------------------------
+
+        right_layout.addWidget(
+            self.stack,
+            1
+        )
+
+        # ------------------------------------------------------
+        # FOOTER
+        # ------------------------------------------------------
+
+        self.footer = (
+            self.create_footer()
+        )
+
+        right_layout.addWidget(
+            self.footer
+        )
+
+        # ------------------------------------------------------
+        # ADD RIGHT AREA
+        # ------------------------------------------------------
+
+        main_layout.addWidget(
+            right_container,
+            1
+        )
+
+    # ==========================================================
+    # CREATE SIDEBAR
+    # ==========================================================
 
     def create_sidebar(self):
 
@@ -130,43 +396,119 @@ class MainWindow(QMainWindow):
             "sidebar"
         )
 
+        # ------------------------------------------------------
+        # SIDEBAR WIDTH
+        # ------------------------------------------------------
+
         sidebar.setFixedWidth(
-            250
+            SIDEBAR_WIDTH
         )
 
-        sidebar_layout = QVBoxLayout(
+        # ------------------------------------------------------
+        # SIDEBAR BACKGROUND
+        # ------------------------------------------------------
+
+        sidebar.setStyleSheet(
+            f"""
+            QFrame#sidebar {{
+                background-color: {COLOR_SIDEBAR};
+                border-right: 1px solid {COLOR_BORDER};
+            }}
+            """
+        )
+
+        # ------------------------------------------------------
+        # SIDEBAR LAYOUT
+        # ------------------------------------------------------
+
+        layout = QVBoxLayout(
             sidebar
         )
 
-        sidebar_layout.setContentsMargins(
-            15,
-            20,
-            15,
-            20
+        layout.setContentsMargins(
+            16,
+            18,
+            16,
+            12
         )
 
-        sidebar_layout.setSpacing(
-            8
+        layout.setSpacing(
+            4
         )
 
-        # Application title
-        app_title = QLabel(
-            "NETWORK\nTRAFFIC ANALYZER"
+        # ======================================================
+        # APPLICATION TITLE
+        # ======================================================
+
+        title_container = QFrame()
+
+        title_container.setFixedHeight(
+            SIDEBAR_TITLE_HEIGHT
         )
 
-        app_title.setObjectName(
-            "appTitle"
+        title_layout = QVBoxLayout(
+            title_container
         )
 
-        app_title.setAlignment(
+        title_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        title_layout.setAlignment(
             Qt.AlignCenter
         )
 
-        sidebar_layout.addWidget(
-            app_title
+        # ------------------------------------------------------
+        # TITLE 1
+        # ------------------------------------------------------
+
+        title_1 = QLabel(
+            "NETWORK"
         )
 
-        # Navigation
+        title_1.setObjectName(
+            "appTitle"
+        )
+
+        title_1.setAlignment(
+            Qt.AlignCenter
+        )
+
+        # ------------------------------------------------------
+        # TITLE 2
+        # ------------------------------------------------------
+
+        title_2 = QLabel(
+            "TRAFFIC ANALYZER"
+        )
+
+        title_2.setObjectName(
+            "appTitle"
+        )
+
+        title_2.setAlignment(
+            Qt.AlignCenter
+        )
+
+        title_layout.addWidget(
+            title_1
+        )
+
+        title_layout.addWidget(
+            title_2
+        )
+
+        layout.addWidget(
+            title_container
+        )
+
+        # ======================================================
+        # NAVIGATION TITLE
+        # ======================================================
+
         navigation_title = QLabel(
             "NAVIGATION"
         )
@@ -175,33 +517,82 @@ class MainWindow(QMainWindow):
             "sectionTitle"
         )
 
-        sidebar_layout.addWidget(
+        layout.addWidget(
             navigation_title
         )
 
-        self.navigation = QListWidget()
-
-        self.navigation.setObjectName(
-            "navigation"
+        layout.addSpacing(
+            6
         )
 
-        navigation_items = [
-            "Dashboard",
-            "Overview",
-            "Inspection",
-        ]
+        # ======================================================
+        # DASHBOARD BUTTON
+        # ======================================================
 
-        for name in navigation_items:
-
-            self.navigation.addItem(
-                QListWidgetItem(name)
+        self.dashboard_button = (
+            self.create_navigation_button(
+                "Dashboard"
             )
-
-        sidebar_layout.addWidget(
-            self.navigation
         )
 
-        # Network adapters
+        self.dashboard_button.clicked.connect(
+            self.show_dashboard
+        )
+
+        layout.addWidget(
+            self.dashboard_button
+        )
+
+        # ======================================================
+        # OVERVIEW BUTTON
+        # ======================================================
+
+        self.overview_button = (
+            self.create_navigation_button(
+                "Overview"
+            )
+        )
+
+        self.overview_button.clicked.connect(
+            self.show_overview
+        )
+
+        layout.addWidget(
+            self.overview_button
+        )
+
+        # ======================================================
+        # INSPECTION BUTTON
+        # ======================================================
+
+        self.inspection_button = (
+            self.create_navigation_button(
+                "Inspection"
+            )
+        )
+
+        self.inspection_button.clicked.connect(
+            self.show_inspection
+        )
+
+        layout.addWidget(
+            self.inspection_button
+        )
+
+        # ======================================================
+        # SPACE BEFORE ADAPTERS
+        # ======================================================
+
+        layout.addSpacing(
+            75
+        )
+
+        # ======================================================
+        # NETWORK ADAPTER HEADER
+        # ======================================================
+
+        adapter_header = QHBoxLayout()
+
         adapter_title = QLabel(
             "NETWORK ADAPTERS"
         )
@@ -210,9 +601,48 @@ class MainWindow(QMainWindow):
             "sectionTitle"
         )
 
-        sidebar_layout.addWidget(
+        adapter_header.addWidget(
             adapter_title
         )
+
+        adapter_header.addStretch()
+
+        # ------------------------------------------------------
+        # REFRESH BUTTON
+        # ------------------------------------------------------
+
+        refresh_button = QPushButton(
+            "⟳"
+        )
+
+        refresh_button.setObjectName(
+            "adapterRefreshButton"
+        )
+
+        refresh_button.setFixedSize(
+            ADAPTER_REFRESH_SIZE,
+            ADAPTER_REFRESH_SIZE
+        )
+
+        refresh_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        refresh_button.clicked.connect(
+            self.refresh_adapters
+        )
+
+        adapter_header.addWidget(
+            refresh_button
+        )
+
+        layout.addLayout(
+            adapter_header
+        )
+
+        # ======================================================
+        # ADAPTER LIST
+        # ======================================================
 
         self.adapter_list = QListWidget()
 
@@ -220,195 +650,485 @@ class MainWindow(QMainWindow):
             "adapterList"
         )
 
-        # Temporary data.
-        # Later this will come from AdapterService.
+        # ------------------------------------------------------
+        # IMPORTANT:
+        #
+        # Prevent horizontal scrollbar.
+        #
+        # This fixes the horizontal bar visible at the
+        # bottom of the sidebar.
+        #
+        # ------------------------------------------------------
+
+        self.adapter_list.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAlwaysOff
+        )
+
+        # ------------------------------------------------------
+        # Vertical scrollbar
+        # ------------------------------------------------------
+
+        self.adapter_list.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+
+        # ------------------------------------------------------
+        # Remove extra frame.
+        # ------------------------------------------------------
+
+        self.adapter_list.setFrameShape(
+            QFrame.NoFrame
+        )
+
+        # ------------------------------------------------------
+        # LIST STYLE
+        # ------------------------------------------------------
+
+        self.adapter_list.setStyleSheet(
+            f"""
+            QListWidget#adapterList {{
+                background-color: transparent;
+                border: none;
+                outline: none;
+                padding: 0px;
+            }}
+
+            QListWidget#adapterList::item {{
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }}
+
+            QListWidget#adapterList::item:selected {{
+                background-color: transparent;
+            }}
+
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 7px;
+                margin: 0px;
+            }}
+
+            QScrollBar::handle:vertical {{
+                background: #214968;
+                border-radius: 3px;
+                min-height: 35px;
+            }}
+
+            QScrollBar::handle:vertical:hover {{
+                background: #2B648A;
+            }}
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            """
+        )
+
+        # ======================================================
+        # ADAPTER DATA
+        # ======================================================
 
         adapters = [
-            "●  Wi-Fi",
-            "○  Ethernet",
-            "○  Bluetooth",
-            "○  VMware Network",
-            "○  VirtualBox Host-Only",
-            "○  vEthernet (WSL)",
-            "○  vEthernet (Default Switch)",
-            "○  Npcap Loopback",
+
+            (
+                "Wi-Fi",
+                "Intel(R) Wi-Fi 6 AX201 160MHz"
+            ),
+
+            (
+                "Ethernet",
+                "Realtek PCIe GbE Family"
+            ),
+
+            (
+                "Bluetooth",
+                "Bluetooth Device"
+            ),
+
+            (
+                "VMware Network",
+                "VMware Virtual Ethernet"
+            ),
+
+            (
+                "VirtualBox Host-Only",
+                "VirtualBox Host-Only"
+            ),
+
+            (
+                "vEthernet (WSL)",
+                "Hyper-V Virtual Ethernet"
+            ),
+
+            (
+                "vEthernet (Default Switch)",
+                "Hyper-V Virtual Ethernet"
+            ),
+
+            (
+                "Npcap Loopback",
+                "Npcap Loopback Adapter"
+            ),
+
+            (
+                "TAP-Windows Adapter",
+                "TAP-Windows Adapter V9"
+            ),
         ]
 
-        for adapter in adapters:
+        # ======================================================
+        # ADD ADAPTER ITEMS
+        # ======================================================
 
-            self.adapter_list.addItem(
-                QListWidgetItem(adapter)
+        for name, description in adapters:
+
+            # --------------------------------------------------
+            # LIST ITEM
+            # --------------------------------------------------
+
+            item = QListWidgetItem()
+
+            # --------------------------------------------------
+            # FIXED SIZE
+            # --------------------------------------------------
+
+            item.setSizeHint(
+                self.adapter_item_size()
             )
 
-        sidebar_layout.addWidget(
-            self.adapter_list
+            self.adapter_list.addItem(
+                item
+            )
+
+            # --------------------------------------------------
+            # CUSTOM WIDGET
+            # --------------------------------------------------
+
+            widget = (
+                self.create_adapter_item(
+                    name,
+                    description
+                )
+            )
+
+            self.adapter_list.setItemWidget(
+                item,
+                widget
+            )
+
+        # ======================================================
+        # ADAPTER CLICK
+        # ======================================================
+
+        self.adapter_list.itemClicked.connect(
+            self.on_adapter_selected
         )
 
-        sidebar_layout.addStretch()
+        # ------------------------------------------------------
+        # Add adapter list.
+        #
+        # stretch = 1 means it uses available space but does
+        # not push the footer outside the window.
+        #
+        # ------------------------------------------------------
 
-        # Footer
-        version = QLabel(
+        layout.addWidget(
+            self.adapter_list,
+            1
+        )
+
+        # ======================================================
+        # SIDEBAR FOOTER
+        # ======================================================
+
+        sidebar_footer = QLabel(
             "NETWORK TRAFFIC ANALYZER\n"
-            "v0.3 • LOCAL MONITOR"
+            "v0.3 · LOCAL MONITOR"
         )
 
-        version.setObjectName(
-            "footer"
+        sidebar_footer.setObjectName(
+            "sidebarFooter"
         )
 
-        version.setAlignment(
+        sidebar_footer.setAlignment(
             Qt.AlignCenter
         )
 
-        sidebar_layout.addWidget(
-            version
+        sidebar_footer.setFixedHeight(
+            38
+        )
+
+        layout.addWidget(
+            sidebar_footer
         )
 
         return sidebar
 
-    # ==================================================
-    # CONTENT AREA
-    # ==================================================
+    # ==========================================================
+    # ADAPTER ITEM SIZE
+    # ==========================================================
 
-    def create_content_area(self):
+    def adapter_item_size(self):
 
-        content = QFrame()
-
-        content.setObjectName(
-            "content"
+        return QSize(
+            SIDEBAR_WIDTH - 45,
+            ADAPTER_ITEM_HEIGHT
         )
 
-        content_layout = QVBoxLayout(
-            content
+    # ==========================================================
+    # CREATE ADAPTER ITEM
+    # ==========================================================
+
+    def create_adapter_item(
+        self,
+        name,
+        description
+    ):
+
+        widget = QFrame()
+
+        widget.setObjectName(
+            "adapterItem"
         )
 
-        content_layout.setContentsMargins(
-            20,
-            15,
-            20,
-            15
+        # ------------------------------------------------------
+        # FIXED HEIGHT
+        # ------------------------------------------------------
+
+        widget.setFixedHeight(
+            ADAPTER_ITEM_HEIGHT
         )
 
-        content_layout.setSpacing(
-            12
+        # ------------------------------------------------------
+        # ITEM LAYOUT
+        # ------------------------------------------------------
+
+        layout = QHBoxLayout(
+            widget
         )
 
-        # Header
-        header = self.create_header()
-
-        content_layout.addWidget(
-            header
+        layout.setContentsMargins(
+            2,
+            4,
+            2,
+            4
         )
 
-        # Pages
-        self.page_stack = QStackedWidget()
-
-        self.page_stack.setObjectName(
-            "pageStack"
+        layout.setSpacing(
+            7
         )
 
-        # ==========================================
-        # REAL DASHBOARD
-        # ==========================================
+        # ======================================================
+        # ADAPTER STATUS ICON
+        # ======================================================
 
-        self.dashboard_page = DashboardPage()
-
-        self.page_stack.addWidget(
-            self.dashboard_page
+        icon = QLabel(
+            "○"
         )
 
-        # ==========================================
-        # TEMPORARY OVERVIEW
-        # ==========================================
-
-        overview_page = self.create_placeholder_page(
-            "Overview",
-            "Network and adapter overview"
+        icon.setObjectName(
+            "adapterIcon"
         )
 
-        self.page_stack.addWidget(
-            overview_page
+        icon.setFixedWidth(
+            18
         )
 
-        # ==========================================
-        # TEMPORARY INSPECTION
-        # ==========================================
-
-        inspection_page = self.create_placeholder_page(
-            "Inspection",
-            "Packet inspection and analysis"
+        icon.setAlignment(
+            Qt.AlignTop |
+            Qt.AlignHCenter
         )
 
-        self.page_stack.addWidget(
-            inspection_page
+        layout.addWidget(
+            icon
         )
 
-        content_layout.addWidget(
-            self.page_stack
+        # ======================================================
+        # TEXT CONTAINER
+        # ======================================================
+
+        text_container = QFrame()
+
+        text_layout = QVBoxLayout(
+            text_container
         )
 
-        # Footer
-        footer = QLabel(
-            "Network Traffic Analyzer"
-            "  •  Python"
-            "  •  PySide6"
-            "  •  Scapy"
-            "  •  Local Network Monitoring"
+        text_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
         )
 
-        footer.setObjectName(
-            "footer"
+        text_layout.setSpacing(
+            0
         )
 
-        footer.setAlignment(
-            Qt.AlignCenter
+        # ------------------------------------------------------
+        # ADAPTER NAME
+        # ------------------------------------------------------
+
+        adapter_name = QLabel(
+            name
         )
 
-        content_layout.addWidget(
-            footer
+        adapter_name.setObjectName(
+            "adapterName"
         )
 
-        return content
+        adapter_name.setFixedHeight(
+            20
+        )
 
-    # ==================================================
+        # ------------------------------------------------------
+        # DESCRIPTION
+        # ------------------------------------------------------
+
+        adapter_description = QLabel(
+            description
+        )
+
+        adapter_description.setObjectName(
+            "adapterDescription"
+        )
+
+        adapter_description.setFixedHeight(
+            18
+        )
+
+        adapter_description.setMaximumWidth(
+            ADAPTER_DESCRIPTION_WIDTH
+        )
+
+        # ------------------------------------------------------
+        # IMPORTANT:
+        #
+        # Prevent description from wrapping to another line.
+        #
+        # ------------------------------------------------------
+
+        adapter_description.setWordWrap(
+            False
+        )
+
+        # ------------------------------------------------------
+        # ADD TEXT
+        # ------------------------------------------------------
+
+        text_layout.addWidget(
+            adapter_name
+        )
+
+        text_layout.addWidget(
+            adapter_description
+        )
+
+        layout.addWidget(
+            text_container,
+            1
+        )
+
+        return widget
+
+    # ==========================================================
+    # NAVIGATION BUTTON
+    # ==========================================================
+
+    def create_navigation_button(
+        self,
+        text
+    ):
+
+        button = QPushButton(
+            text
+        )
+
+        button.setObjectName(
+            "navigationButton"
+        )
+
+        button.setFixedHeight(
+            NAV_BUTTON_HEIGHT
+        )
+
+        button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        return button
+
+    # ==========================================================
     # HEADER
-    # ==================================================
+    # ==========================================================
 
     def create_header(self):
 
         header = QFrame()
 
         header.setObjectName(
-            "header"
+            "mainHeader"
         )
 
-        header_layout = QHBoxLayout(
+        # ------------------------------------------------------
+        # HEADER HEIGHT
+        # ------------------------------------------------------
+
+        header.setFixedHeight(
+            HEADER_HEIGHT
+        )
+
+        # ------------------------------------------------------
+        # HEADER STYLE
+        # ------------------------------------------------------
+
+        header.setStyleSheet(
+            f"""
+            QFrame#mainHeader {{
+                background-color: {COLOR_PANEL};
+                border-bottom: 1px solid {COLOR_BORDER};
+            }}
+            """
+        )
+
+        # ------------------------------------------------------
+        # HEADER LAYOUT
+        # ------------------------------------------------------
+
+        layout = QHBoxLayout(
             header
         )
 
-        header_layout.setContentsMargins(
-            15,
-            10,
-            15,
-            10
+        layout.setContentsMargins(
+            14,
+            4,
+            14,
+            4
         )
 
-        # Page title
+        # ------------------------------------------------------
+        # PAGE TITLE
+        # ------------------------------------------------------
+
         self.page_title = QLabel(
             "Dashboard"
         )
 
         self.page_title.setObjectName(
-            "pageTitle"
+            "pageHeaderTitle"
         )
 
-        header_layout.addWidget(
+        layout.addWidget(
             self.page_title
         )
 
-        header_layout.addStretch()
+        layout.addStretch()
 
-        # Capture status
+        # ------------------------------------------------------
+        # SYSTEM STATUS
+        # ------------------------------------------------------
+
         self.system_status = QLabel(
             "● SYSTEM READY"
         )
@@ -417,121 +1137,390 @@ class MainWindow(QMainWindow):
             "systemStatus"
         )
 
-        header_layout.addWidget(
+        layout.addWidget(
             self.system_status
         )
 
         return header
 
-    # ==================================================
-    # PLACEHOLDER
-    # ==================================================
+    # ==========================================================
+    # FOOTER
+    # ==========================================================
 
-    def create_placeholder_page(
-        self,
-        title,
-        description
-    ):
+    def create_footer(self):
 
-        page = QWidget()
+        footer = QFrame()
 
-        layout = QVBoxLayout(
-            page
+        footer.setObjectName(
+            "mainFooter"
         )
 
-        title_label = QLabel(
-            title
+        # ------------------------------------------------------
+        # FOOTER HEIGHT
+        # ------------------------------------------------------
+
+        footer.setFixedHeight(
+            FOOTER_HEIGHT
         )
 
-        title_label.setObjectName(
-            "placeholder"
+        # ------------------------------------------------------
+        # FOOTER STYLE
+        # ------------------------------------------------------
+
+        footer.setStyleSheet(
+            f"""
+            QFrame#mainFooter {{
+                background-color: {COLOR_PANEL};
+                border-top: 1px solid {COLOR_BORDER};
+            }}
+            """
         )
 
-        title_label.setAlignment(
-            Qt.AlignCenter
+        # ------------------------------------------------------
+        # FOOTER LAYOUT
+        # ------------------------------------------------------
+
+        layout = QHBoxLayout(
+            footer
         )
 
-        description_label = QLabel(
-            description
+        layout.setContentsMargins(
+            10,
+            2,
+            10,
+            2
         )
 
-        description_label.setProperty(
-            "secondary",
-            True
+        # ------------------------------------------------------
+        # LEFT
+        # ------------------------------------------------------
+
+        left = QLabel(
+            "Network Traffic Analyzer"
         )
 
-        description_label.setAlignment(
-            Qt.AlignCenter
+        left.setObjectName(
+            "footerText"
+        )
+
+        layout.addWidget(
+            left
         )
 
         layout.addStretch()
 
-        layout.addWidget(
-            title_label
+        # ------------------------------------------------------
+        # RIGHT
+        # ------------------------------------------------------
+
+        right = QLabel(
+            "Python / PySide6 / Scapy"
+        )
+
+        right.setObjectName(
+            "footerText"
         )
 
         layout.addWidget(
-            description_label
+            right
         )
 
-        layout.addStretch()
+        return footer
 
-        return page
+    # ==========================================================
+    # SHOW DASHBOARD
+    # ==========================================================
 
-    # ==================================================
-    # PAGE CHANGE
-    # ==================================================
+    def show_dashboard(self):
 
-    def change_page(
+        # ------------------------------------------------------
+        # PAGE INDEX
+        # ------------------------------------------------------
+
+        self.stack.setCurrentIndex(
+            0
+        )
+
+        # ------------------------------------------------------
+        # HEADER TITLE
+        # ------------------------------------------------------
+
+        self.page_title.setText(
+            "Dashboard"
+        )
+
+        # ------------------------------------------------------
+        # ACTIVE BUTTON
+        # ------------------------------------------------------
+
+        self.set_active_navigation(
+            self.dashboard_button
+        )
+
+    # ==========================================================
+    # SHOW OVERVIEW
+    # ==========================================================
+
+    def show_overview(self):
+
+        self.stack.setCurrentIndex(
+            1
+        )
+
+        self.page_title.setText(
+            "Overview"
+        )
+
+        self.set_active_navigation(
+            self.overview_button
+        )
+
+    # ==========================================================
+    # SHOW INSPECTION
+    # ==========================================================
+
+    def show_inspection(self):
+
+        self.stack.setCurrentIndex(
+            2
+        )
+
+        self.page_title.setText(
+            "Inspection"
+        )
+
+        self.set_active_navigation(
+            self.inspection_button
+        )
+
+    # ==========================================================
+    # ACTIVE NAVIGATION
+    # ==========================================================
+
+    def set_active_navigation(
         self,
-        index
+        active_button
     ):
 
-        if index < 0:
-            return
+        buttons = [
 
-        if index >= self.page_stack.count():
-            return
+            self.dashboard_button,
 
-        self.page_stack.setCurrentIndex(
-            index
-        )
+            self.overview_button,
 
-        page_names = [
-            "Dashboard",
-            "Overview",
-            "Inspection",
+            self.inspection_button,
         ]
 
-        if index < len(page_names):
+        for button in buttons:
 
-            self.page_title.setText(
-                page_names[index]
+            # --------------------------------------------------
+            # Store active state.
+            # theme.qss can use this property.
+            # --------------------------------------------------
+
+            button.setProperty(
+                "active",
+                button is active_button
             )
 
-    # ==================================================
-    # SYSTEM STATUS
-    # ==================================================
+            # --------------------------------------------------
+            # Refresh stylesheet state.
+            # --------------------------------------------------
 
-    def set_system_status(
+            button.style().unpolish(
+                button
+            )
+
+            button.style().polish(
+                button
+            )
+
+            button.update()
+
+    # ==========================================================
+    # ADAPTER SELECTION
+    # ==========================================================
+
+    def on_adapter_selected(
         self,
-        status,
-        status_type="normal"
+        item
     ):
 
-        self.system_status.setText(
-            f"● {status}"
+        # ------------------------------------------------------
+        # Get custom widget.
+        # ------------------------------------------------------
+
+        widget = (
+            self.adapter_list.itemWidget(
+                item
+            )
         )
 
-        self.system_status.setProperty(
-            "status",
-            status_type
+        if widget is None:
+            return
+
+        # ------------------------------------------------------
+        # Find adapter name label.
+        # ------------------------------------------------------
+
+        name_label = widget.findChild(
+            QLabel,
+            "adapterName"
         )
 
-        self.system_status.style().unpolish(
-            self.system_status
+        if name_label is None:
+            return
+
+        # ------------------------------------------------------
+        # Get name.
+        # ------------------------------------------------------
+
+        adapter_name = (
+            name_label.text()
         )
 
-        self.system_status.style().polish(
-            self.system_status
+        # ------------------------------------------------------
+        # Save selected adapter.
+        # ------------------------------------------------------
+
+        self.selected_adapter = (
+            adapter_name
         )
+
+        # ------------------------------------------------------
+        # Send selection to Overview.
+        # ------------------------------------------------------
+
+        self.overview_page.set_adapter(
+
+            adapter_name=adapter_name,
+
+            description=(
+                "Selected network adapter"
+            ),
+
+            status="Connected"
+        )
+
+        # ------------------------------------------------------
+        # Send selection to Dashboard if supported.
+        # ------------------------------------------------------
+
+        if hasattr(
+            self.dashboard_page,
+            "set_selected_adapter"
+        ):
+
+            self.dashboard_page.set_selected_adapter(
+                {
+                    "name": adapter_name
+                }
+            )
+
+    # ==========================================================
+    # REFRESH ADAPTERS
+    # ==========================================================
+
+    def refresh_adapters(self):
+
+        # ------------------------------------------------------
+        # BACKEND CONNECTION WILL COME HERE.
+        #
+        # Future architecture:
+        #
+        # MainWindow
+        #     ↓
+        # AdapterService
+        #     ↓
+        # adapters.py
+        #     ↓
+        # psutil
+        #
+        # ------------------------------------------------------
+
+        print(
+            "Adapter refresh requested."
+        )
+
+    # ==========================================================
+    # LOAD THEME
+    # ==========================================================
+
+    def load_theme(self):
+
+        # ------------------------------------------------------
+        # theme.qss location:
+        #
+        # frontend/
+        #     styles/
+        #         theme.qss
+        #
+        # ------------------------------------------------------
+
+        theme_path = os.path.join(
+
+            os.path.dirname(
+                __file__
+            ),
+
+            "styles",
+
+            "theme.qss"
+        )
+
+        # ------------------------------------------------------
+        # CHECK THEME FILE
+        # ------------------------------------------------------
+
+        if not os.path.exists(
+            theme_path
+        ):
+
+            print(
+                "WARNING: theme.qss not found:"
+            )
+
+            print(
+                theme_path
+            )
+
+            return
+
+        # ------------------------------------------------------
+        # READ THEME
+        # ------------------------------------------------------
+
+        try:
+
+            with open(
+                theme_path,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                stylesheet = (
+                    file.read()
+                )
+
+            # --------------------------------------------------
+            # APPLY GLOBAL THEME
+            # --------------------------------------------------
+
+            self.setStyleSheet(
+                stylesheet
+            )
+
+        except Exception as error:
+
+            print(
+                "Unable to load theme.qss:"
+            )
+
+            print(
+                error
+            )
+
+
+# ==============================================================
+# END OF MAIN_WINDOW.PY
+# ==============================================================
