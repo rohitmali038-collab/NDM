@@ -1,0 +1,550 @@
+/* ============================================================
+   NETWORK TRAFFIC ANALYZER
+   CYBERSECURITY UI THEME
+   ============================================================ */
+
+
+/* ============================================================
+   GLOBAL
+   ============================================================ */
+
+QMainWindow {
+    background-color: #050B14;
+    color: #F1F5F9;
+    font-family: "Segoe UI";
+    font-size: 13px;
+}
+
+QWidget {
+    color: #F1F5F9;
+}
+
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+#sidebar {
+    background-color: #07111F;
+    border-right: 1px solid #17324D;
+}
+
+
+/* ============================================================
+   APPLICATION TITLE
+   ============================================================ */
+
+#appTitle {
+    color: #00E5FF;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    padding: 15px 5px 20px 5px;
+}
+
+
+/* ============================================================
+   SECTION TITLE
+   ============================================================ */
+
+#sectionTitle {
+    color: #00A8FF;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 14px 8px 5px 8px;
+}
+
+
+/* ============================================================
+   MAIN NAVIGATION
+   ============================================================ */
+
+#navigation {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    padding: 5px;
+}
+
+#navigation::item {
+    background-color: transparent;
+    color: #94A3B8;
+    border-radius: 6px;
+    padding: 11px 13px;
+    margin: 2px 0px;
+}
+
+#navigation::item:hover {
+    background-color: #102A4A;
+    color: #F1F5F9;
+}
+
+#navigation::item:selected {
+    background-color: #0D47A1;
+    color: #FFFFFF;
+    border-left: 3px solid #00E5FF;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   NETWORK ADAPTERS
+   ============================================================ */
+
+#adapterList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    padding: 5px;
+}
+
+#adapterList::item {
+    background-color: transparent;
+    color: #94A3B8;
+    border-radius: 5px;
+    padding: 8px 11px;
+    margin: 2px 0px;
+}
+
+#adapterList::item:hover {
+    background-color: #102A4A;
+    color: #F1F5F9;
+}
+
+#adapterList::item:selected {
+    background-color: #0F1F33;
+    color: #00E5FF;
+    border-left: 3px solid #1683FF;
+}
+
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+
+#content {
+    background-color: #050B14;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+#header {
+    background-color: #0B1728;
+    border: 1px solid #17324D;
+    border-radius: 8px;
+}
+
+#pageTitle {
+    color: #F1F5F9;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+#systemStatus {
+    color: #00E676;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   PAGE STACK
+   ============================================================ */
+
+#pageStack {
+    background-color: transparent;
+    border: none;
+}
+
+
+/* ============================================================
+   PLACEHOLDER
+   ============================================================ */
+
+#placeholder {
+    color: #00A8FF;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+#footer {
+    color: #64748B;
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+
+QFrame[panel="true"] {
+    background-color: #0B1728;
+    border: 1px solid #17324D;
+    border-radius: 8px;
+}
+
+
+/* ============================================================
+   METRIC CARDS
+   ============================================================ */
+
+QFrame[metricCard="true"] {
+    background-color: #0B1728;
+    border: 1px solid #17324D;
+    border-radius: 8px;
+}
+
+QFrame[metricCard="true"]:hover {
+    border: 1px solid #1683FF;
+}
+
+
+/* ============================================================
+   CARD TITLES
+   ============================================================ */
+
+QLabel[cardTitle="true"] {
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+
+/* ============================================================
+   METRIC VALUES
+   ============================================================ */
+
+QLabel[metricValue="true"] {
+    color: #F1F5F9;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   PRIMARY BUTTON
+   ============================================================ */
+
+QPushButton {
+    background-color: #1683FF;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #00A8FF;
+}
+
+QPushButton:pressed {
+    background-color: #0D47A1;
+}
+
+QPushButton:disabled {
+    background-color: #17324D;
+    color: #64748B;
+}
+
+
+/* ============================================================
+   SUCCESS BUTTON
+   ============================================================ */
+
+QPushButton[success="true"] {
+    background-color: #008F52;
+    color: #FFFFFF;
+}
+
+QPushButton[success="true"]:hover {
+    background-color: #00E676;
+}
+
+
+/* ============================================================
+   DANGER BUTTON
+   ============================================================ */
+
+QPushButton[danger="true"] {
+    background-color: #9F1239;
+    color: #FFFFFF;
+}
+
+QPushButton[danger="true"]:hover {
+    background-color: #FF3B4E;
+}
+
+
+/* ============================================================
+   SECONDARY BUTTON
+   ============================================================ */
+
+QPushButton[secondary="true"] {
+    background-color: #0F1F33;
+    color: #CBD5E1;
+    border: 1px solid #17324D;
+}
+
+QPushButton[secondary="true"]:hover {
+    background-color: #102A4A;
+    border-color: #1683FF;
+}
+
+
+/* ============================================================
+   LINE EDIT
+   ============================================================ */
+
+QLineEdit {
+    background-color: #07111F;
+    color: #F1F5F9;
+    border: 1px solid #17324D;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+QLineEdit:hover {
+    border-color: #245275;
+}
+
+QLineEdit:focus {
+    border: 1px solid #1683FF;
+}
+
+
+/* ============================================================
+   COMBO BOX
+   ============================================================ */
+
+QComboBox {
+    background-color: #07111F;
+    color: #F1F5F9;
+    border: 1px solid #17324D;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+QComboBox:hover {
+    border-color: #1683FF;
+}
+
+QComboBox:focus {
+    border-color: #00A8FF;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #0B1728;
+    color: #F1F5F9;
+    border: 1px solid #17324D;
+    selection-background-color: #0D47A1;
+}
+
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+
+QTableWidget {
+    background-color: #0B1728;
+    alternate-background-color: #081522;
+    color: #CBD5E1;
+    border: 1px solid #17324D;
+    border-radius: 8px;
+    gridline-color: #17324D;
+    selection-background-color: #102A4A;
+    selection-color: #F1F5F9;
+}
+
+QTableWidget::item {
+    padding: 7px;
+}
+
+QTableWidget::item:selected {
+    background-color: #102A4A;
+}
+
+QHeaderView::section {
+    background-color: #07111F;
+    color: #00A8FF;
+    border: none;
+    border-bottom: 1px solid #17324D;
+    padding: 9px;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+
+QScrollBar:vertical {
+    background-color: #050B14;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #17324D;
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #1683FF;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background-color: #050B14;
+    height: 8px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #17324D;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #1683FF;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+
+/* ============================================================
+   SPECIAL LABELS
+   ============================================================ */
+
+QLabel[heading="true"] {
+    color: #00A8FF;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+QLabel[secondary="true"] {
+    color: #94A3B8;
+    font-size: 12px;
+}
+
+QLabel[success="true"] {
+    color: #00E676;
+}
+
+QLabel[warning="true"] {
+    color: #FFC107;
+}
+
+QLabel[suspicious="true"] {
+    color: #FF9800;
+}
+
+QLabel[danger="true"] {
+    color: #FF3B4E;
+}
+
+QLabel[analytics="true"] {
+    color: #8B5CF6;
+}
+
+
+/* ============================================================
+   STATUS INDICATORS
+   ============================================================ */
+
+QLabel[status="online"] {
+    color: #00E676;
+}
+
+QLabel[status="warning"] {
+    color: #FFC107;
+}
+
+QLabel[status="suspicious"] {
+    color: #FF9800;
+}
+
+QLabel[status="critical"] {
+    color: #FF3B4E;
+}
+
+QLabel[status="offline"] {
+    color: #64748B;
+}
+
+
+/* ============================================================
+   PROGRESS BAR
+   ============================================================ */
+
+QProgressBar {
+    background-color: #07111F;
+    border: 1px solid #17324D;
+    border-radius: 5px;
+    text-align: center;
+    color: #F1F5F9;
+    height: 10px;
+}
+
+QProgressBar::chunk {
+    background-color: #1683FF;
+    border-radius: 4px;
+}
+
+
+/* ============================================================
+   TAB WIDGET
+   ============================================================ */
+
+QTabWidget::pane {
+    background-color: #0B1728;
+    border: 1px solid #17324D;
+    border-radius: 6px;
+}
+
+QTabBar::tab {
+    background-color: #07111F;
+    color: #94A3B8;
+    padding: 9px 16px;
+    border: 1px solid #17324D;
+    border-bottom: none;
+}
+
+QTabBar::tab:hover {
+    color: #F1F5F9;
+}
+
+QTabBar::tab:selected {
+    background-color: #0B1728;
+    color: #00E5FF;
+    border-top: 2px solid #1683FF;
+}
+
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+
+QToolTip {
+    background-color: #0B1728;
+    color: #F1F5F9;
+    border: 1px solid #1683FF;
+    padding: 6px;
+}
