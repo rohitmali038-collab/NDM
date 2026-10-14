@@ -1,283 +1,253 @@
-
-
-# ==============================================================
-# NETWORK TRAFFIC ANALYZER
-# NDM SCANNER PAGE
-# ==============================================================
-#
-# PAGE 5
-#
-# NDM = Network Defense Monitor
-#
-# Modules:
-#   - Network Discovery
-#   - Port Scanning
-#   - Service Detection
-#   - Vulnerability Assessment
-#   - Risk Scoring
-#   - Threat Intelligence Ready
-#   - Security Findings
-#   - Scan Report Ready
-#
-# FRONTEND ONLY
-# Backend scanner will be connected later.
-#
-# ==============================================================
+# ============================================================
+# NDM SCANNER
+# Network Defense Monitor
+# UI ONLY
+# ============================================================
 
 from PySide6.QtCore import Qt, Signal
-
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
-    QFrame,
-    QLabel,
-    QPushButton,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
+    QLabel,
+    QPushButton,
     QLineEdit,
     QComboBox,
     QProgressBar,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
-    QAbstractItemView,
     QHeaderView,
-    QTabWidget,
-    QMessageBox,
+    QFrame,
+    QTextEdit,
+    QSpinBox,
+    QScrollArea,
 )
 
 
-# ==============================================================
-# SIZE CONFIGURATION
-# ==============================================================
-
-PAGE_SPACING = 8
-
-HEADER_HEIGHT = 64
-
-CONTROL_HEIGHT = 58
-
-STATUS_HEIGHT = 96
-
-TABLE_MIN_HEIGHT = 330
-
-TABLE_ROW_HEIGHT = 30
-
-BUTTON_HEIGHT = 32
-
-INPUT_HEIGHT = 32
-
-
-# ==============================================================
-# TABLE COLUMN WIDTHS
-# ==============================================================
-
-HOST_IP_WIDTH = 140
-
-HOSTNAME_WIDTH = 150
-
-MAC_WIDTH = 145
-
-VENDOR_WIDTH = 130
-
-STATUS_WIDTH = 90
-
-LATENCY_WIDTH = 100
-
-
-PORT_HOST_WIDTH = 135
-
-PORT_WIDTH = 75
-
-SERVICE_WIDTH = 120
-
-VERSION_WIDTH = 150
-
-RISK_WIDTH = 100
-
-
-VULN_HOST_WIDTH = 140
-
-VULN_PORT_WIDTH = 70
-
-VULN_SERVICE_WIDTH = 120
-
-VULN_FINDING_WIDTH = 300
-
-VULN_SEVERITY_WIDTH = 100
-
-VULN_CONFIDENCE_WIDTH = 110
-
-
-# ==============================================================
+# ============================================================
 # COLORS
-# ==============================================================
+# ============================================================
 
-COLOR_BACKGROUND = "#050B14"
+COLOR_BG = "#0B1120"
+COLOR_PANEL = "#111827"
+COLOR_PANEL_2 = "#0F172A"
+COLOR_BORDER = "#1F2937"
 
-COLOR_PANEL = "#0B1728"
+COLOR_BLUE = "#2563EB"
+COLOR_BLUE_HOVER = "#3B82F6"
+COLOR_CYAN = "#60A5FA"
 
-COLOR_PANEL_DARK = "#071321"
-
-COLOR_BORDER = "#17324D"
-
-COLOR_BORDER_LIGHT = "#1D3857"
-
-COLOR_CYAN = "#00E5FF"
-
-COLOR_BLUE = "#1683FF"
-
-COLOR_GREEN = "#00E676"
-
-COLOR_YELLOW = "#FFC107"
-
-COLOR_ORANGE = "#FF9800"
-
-COLOR_RED = "#FF3B4E"
-
+COLOR_GREEN = "#22C55E"
+COLOR_YELLOW = "#EAB308"
+COLOR_ORANGE = "#F97316"
+COLOR_RED = "#DC2626"
 COLOR_PURPLE = "#A78BFA"
 
-COLOR_TEXT = "#F1F5F9"
-
+COLOR_TEXT = "#E5E7EB"
 COLOR_SECONDARY = "#94A3B8"
-
 COLOR_MUTED = "#64748B"
 
 
-# ==============================================================
+# ============================================================
 # NDM SCANNER PAGE
-# ==============================================================
-
+# ============================================================
 
 class NDMScannerPage(QWidget):
 
-    # ----------------------------------------------------------
-    # Signals
-    # ----------------------------------------------------------
-
     start_scan_requested = Signal(dict)
-
     stop_scan_requested = Signal()
 
     host_selected = Signal(dict)
-
     vulnerability_selected = Signal(dict)
 
-    # ==========================================================
-    # CONSTRUCTOR
-    # ==========================================================
+    # ========================================================
+    # INITIALIZE
+    # ========================================================
 
-    def __init__(self):
+    def __init__(self, parent=None):
 
-        super().__init__()
+        super().__init__(parent)
 
-        self.setObjectName(
-            "ndmScannerPage"
-        )
-
-        self.all_hosts = []
-
-        self.all_ports = []
-
-        self.all_vulnerabilities = []
-
-        self.scan_running = False
+        self.hosts = []
+        self.ports = []
+        self.services = []
+        self.vulnerabilities = []
+        self.threat_intelligence = []
 
         self.setup_ui()
 
         self.load_demo_data()
 
-    # ==========================================================
+    # ========================================================
     # MAIN UI
-    # ==========================================================
+    # ========================================================
 
     def setup_ui(self):
+
+        self.setObjectName(
+            "NDMScannerPage"
+        )
+        self.setAutoFillBackground(True)
+        page_palette = self.palette()
+        page_palette.setColor(page_palette.ColorRole.Window, QColor(COLOR_BG))
+        page_palette.setColor(page_palette.ColorRole.Base, QColor(COLOR_BG))
+        page_palette.setColor(page_palette.ColorRole.Text, QColor(COLOR_TEXT))
+        self.setPalette(page_palette)
+
+        # UI-only page theme: style native widgets that otherwise use
+        # Windows' bright default palette (text areas, inputs, tables).
+        self.setStyleSheet("""
+            QWidget#NDMScannerPage {
+                background-color: #0B1120;
+                color: #E5E7EB;
+                font-family: "Segoe UI";
+                font-size: 10px;
+            }
+            QWidget#NDMScannerPage QWidget {
+                color: #E5E7EB;
+            }
+            QWidget#NDMScannerPage,
+            QWidget#NDMScannerPage QWidget,
+            QWidget#NDMScannerPage QTabWidget,
+            QWidget#NDMScannerPage QTabWidget::widget,
+            QWidget#NDMScannerPage QStackedWidget,
+            QWidget#NDMScannerPage QScrollArea,
+            QWidget#NDMScannerPage QScrollArea > QWidget,
+            QWidget#NDMScannerPage QScrollArea > QWidget > QWidget {
+                background-color: #0B1120;
+            }
+            QWidget#NDMScannerPage QFrame {
+                color: #E5E7EB;
+            }
+            QWidget#NDMScannerPage QLabel {
+                background-color: transparent;
+            }
+            QWidget#NDMScannerPage QToolTip {
+                background-color: #172033;
+                color: #E5E7EB;
+                border: 1px solid #334155;
+                padding: 5px;
+            }
+            QWidget#NDMScannerPage QScrollArea,
+            QWidget#NDMScannerPage QScrollArea > QWidget > QWidget {
+                background-color: #0B1120;
+                border: none;
+            }
+            QWidget#NDMScannerPage QTextEdit {
+                background-color: #0F172A;
+                color: #E5E7EB;
+            }
+            QWidget#NDMScannerPage QLineEdit,
+            QWidget#NDMScannerPage QComboBox,
+            QWidget#NDMScannerPage QSpinBox,
+            QWidget#NDMScannerPage QTextEdit,
+            QWidget#NDMScannerPage QPlainTextEdit {
+                background-color: #0F172A;
+                color: #E5E7EB;
+                border: 1px solid #263449;
+                border-radius: 5px;
+                padding: 5px;
+                selection-background-color: #2563EB;
+                selection-color: #FFFFFF;
+            }
+            QWidget#NDMScannerPage QComboBox QAbstractItemView {
+                background-color: #111827;
+                color: #E5E7EB;
+                border: 1px solid #334155;
+                selection-background-color: #2563EB;
+                selection-color: #FFFFFF;
+            }
+            QWidget#NDMScannerPage QTableWidget {
+                background-color: #0F172A;
+                alternate-background-color: #111827;
+                color: #E5E7EB;
+                gridline-color: #263449;
+                border: 1px solid #263449;
+                selection-background-color: #1D4ED8;
+                selection-color: #FFFFFF;
+                outline: 0;
+            }
+            QWidget#NDMScannerPage QTableWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #1F2937;
+            }
+            QWidget#NDMScannerPage QHeaderView::section {
+                background-color: #172033;
+                color: #93C5FD;
+                border: 1px solid #263449;
+                padding: 7px 5px;
+                font-weight: 700;
+            }
+            QWidget#NDMScannerPage QTabWidget::pane {
+                background-color: #0B1120;
+                border: 1px solid #1F2937;
+                border-radius: 6px;
+                top: -1px;
+            }
+            QWidget#NDMScannerPage QTabBar::tab {
+                background-color: #111827;
+                color: #94A3B8;
+                border: 1px solid #263449;
+                padding: 9px 13px;
+                margin-right: 2px;
+            }
+            QWidget#NDMScannerPage QTabBar::tab:selected {
+                background-color: #2563EB;
+                color: #FFFFFF;
+                border-color: #3B82F6;
+            }
+            QWidget#NDMScannerPage QProgressBar {
+                background-color: #0F172A;
+                color: #E5E7EB;
+                border: 1px solid #1F2937;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QWidget#NDMScannerPage QProgressBar::chunk {
+                background-color: #2563EB;
+                border-radius: 3px;
+            }
+            QWidget#NDMScannerPage QScrollBar:vertical,
+            QWidget#NDMScannerPage QScrollBar:horizontal {
+                background-color: #0B1120;
+                border: none;
+                width: 10px;
+                height: 10px;
+            }
+            QWidget#NDMScannerPage QScrollBar::handle:vertical,
+            QWidget#NDMScannerPage QScrollBar::handle:horizontal {
+                background-color: #334155;
+                border-radius: 4px;
+                min-height: 20px;
+                min-width: 20px;
+            }
+        """)
 
         main_layout = QVBoxLayout(
             self
         )
 
         main_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0
+            16,
+            14,
+            16,
+            14
         )
 
         main_layout.setSpacing(
-            PAGE_SPACING
+            10
         )
 
-        # ------------------------------------------------------
-        # Header
-        # ------------------------------------------------------
+        # ----------------------------------------------------
+        # HEADER
+        # ----------------------------------------------------
 
-        main_layout.addWidget(
-            self.create_page_header()
-        )
+        header = QHBoxLayout()
 
-        # ------------------------------------------------------
-        # Scanner controls
-        # ------------------------------------------------------
-
-        main_layout.addWidget(
-            self.create_scan_controls()
-        )
-
-        # ------------------------------------------------------
-        # Scan status
-        # ------------------------------------------------------
-
-        main_layout.addWidget(
-            self.create_scan_status()
-        )
-
-        # ------------------------------------------------------
-        # Main tabs
-        # ------------------------------------------------------
-
-        main_layout.addWidget(
-            self.create_tabs(),
-            1
-        )
-
-    # ==========================================================
-    # PAGE HEADER
-    # ==========================================================
-
-    def create_page_header(self):
-
-        frame = QFrame()
-
-        frame.setFixedHeight(
-            HEADER_HEIGHT
-        )
-
-        frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: transparent;
-                border: none;
-            }}
-            """
-        )
-
-        layout = QVBoxLayout(
-            frame
-        )
-
-        layout.setContentsMargins(
-            4,
-            4,
-            4,
-            2
-        )
-
-        layout.setSpacing(
-            2
-        )
-
-        # ------------------------------------------------------
-        # Title
-        # ------------------------------------------------------
+        title_layout = QVBoxLayout()
 
         title = QLabel(
             "NDM SCANNER"
@@ -289,21 +259,12 @@ class NDMScannerPage(QWidget):
                 color: {COLOR_TEXT};
                 font-size: 22px;
                 font-weight: 700;
-                letter-spacing: 1px;
             }}
             """
         )
 
-        layout.addWidget(
-            title
-        )
-
-        # ------------------------------------------------------
-        # Subtitle
-        # ------------------------------------------------------
-
         subtitle = QLabel(
-            "Network discovery, service analysis and security assessment"
+            "Network discovery, service detection and security assessment"
         )
 
         subtitle.setStyleSheet(
@@ -315,623 +276,488 @@ class NDMScannerPage(QWidget):
             """
         )
 
-        layout.addWidget(
+        title_layout.addWidget(
+            title
+        )
+
+        title_layout.addWidget(
             subtitle
         )
 
-        return frame
-
-    # ==========================================================
-    # SCAN CONTROLS
-    # ==========================================================
-
-    def create_scan_controls(self):
-
-        frame = QFrame()
-
-        frame.setObjectName(
-            "scanControls"
+        header.addLayout(
+            title_layout
         )
 
-        frame.setFixedHeight(
-            CONTROL_HEIGHT
+        header.addStretch()
+
+        self.scan_status = QLabel(
+            "● READY"
         )
 
-        frame.setStyleSheet(
+        self.set_status_style(
+            COLOR_GREEN,
+            "#10251A",
+            "#1B5E36"
+        )
+
+        header.addWidget(
+            self.scan_status
+        )
+
+        main_layout.addLayout(
+            header
+        )
+
+        # ----------------------------------------------------
+        # SCAN CONTROL
+        # ----------------------------------------------------
+
+        control_panel = QFrame()
+
+        control_panel.setObjectName(
+            "ScannerControlPanel"
+        )
+
+        control_panel.setStyleSheet(
             f"""
-            QFrame#scanControls {{
-                background-color: {COLOR_PANEL};
+            QFrame#ScannerControlPanel {{
+                background: {COLOR_PANEL};
                 border: 1px solid {COLOR_BORDER};
-                border-radius: 7px;
+                border-radius: 8px;
             }}
             """
         )
 
-        layout = QHBoxLayout(
-            frame
+        control_layout = QGridLayout(
+            control_panel
         )
 
-        layout.setContentsMargins(
-            10,
-            8,
-            10,
-            8
+        control_layout.setContentsMargins(
+            14,
+            12,
+            14,
+            12
         )
 
-        layout.setSpacing(
-            8
+        control_layout.setHorizontalSpacing(
+            10
         )
 
-        # ======================================================
-        # NETWORK LABEL
-        # ======================================================
-
-        network_label = QLabel(
-            "Network:"
+        control_layout.setVerticalSpacing(
+            5
         )
 
-        network_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_TEXT};
-                font-size: 12px;
-                font-weight: 600;
-            }}
-            """
+        # Target
+
+        target_label = self.create_control_label(
+            "TARGET NETWORK"
         )
 
-        layout.addWidget(
-            network_label
-        )
+        self.target_input = QLineEdit()
 
-        # ======================================================
-        # NETWORK INPUT
-        # ======================================================
-
-        self.network_input = QLineEdit()
-
-        self.network_input.setText(
+        self.target_input.setText(
             "192.168.1.0/24"
         )
 
-        self.network_input.setPlaceholderText(
-            "Network / CIDR"
+        self.target_input.setPlaceholderText(
+            "192.168.1.0/24"
         )
 
-        self.network_input.setFixedHeight(
-            INPUT_HEIGHT
-        )
-
-        self.network_input.setMinimumWidth(
-            180
-        )
-
-        self.network_input.setStyleSheet(
-            f"""
-            QLineEdit {{
-                background-color: #081321;
-                color: {COLOR_TEXT};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 5px;
-                padding: 0 9px;
-                font-size: 11px;
-            }}
-
-            QLineEdit:focus {{
-                border: 1px solid {COLOR_CYAN};
-            }}
-            """
-        )
-
-        layout.addWidget(
-            self.network_input
-        )
-
-        # ======================================================
-        # AUTO BUTTON
-        # ======================================================
-
-        self.auto_button = QPushButton(
+        auto_button = QPushButton(
             "AUTO"
         )
 
-        self.auto_button.setFixedHeight(
-            BUTTON_HEIGHT
+        auto_button.setFixedWidth(
+            70
         )
 
-        self.auto_button.setStyleSheet(
-            self.button_style(
-                COLOR_BORDER
-            )
-        )
-
-        self.auto_button.clicked.connect(
+        auto_button.clicked.connect(
             self.auto_detect_network
         )
 
-        layout.addWidget(
-            self.auto_button
+        control_layout.addWidget(
+            target_label,
+            0,
+            0
         )
 
-        # ======================================================
-        # SCAN PROFILE
-        # ======================================================
-
-        profile_label = QLabel(
-            "Profile:"
+        control_layout.addWidget(
+            self.target_input,
+            1,
+            0
         )
 
-        profile_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 11px;
-            }}
-            """
+        control_layout.addWidget(
+            auto_button,
+            1,
+            1
         )
 
-        layout.addWidget(
-            profile_label
+        # Profile
+
+        profile_label = self.create_control_label(
+            "SCAN PROFILE"
         )
 
-        self.scan_profile = QComboBox()
+        self.profile_combo = QComboBox()
 
-        self.scan_profile.addItems(
+        self.profile_combo.addItems(
             [
                 "Quick Discovery",
-                "Standard Security",
-                "Full Network Audit",
-                "Vulnerability Assessment",
-                "Custom",
+                "Standard Scan",
+                "Full Network Scan",
+                "Vulnerability Scan",
+                "Custom Scan",
             ]
         )
 
-        self.scan_profile.setFixedHeight(
-            INPUT_HEIGHT
+        control_layout.addWidget(
+            profile_label,
+            0,
+            2
         )
 
-        self.scan_profile.setMinimumWidth(
-            180
+        control_layout.addWidget(
+            self.profile_combo,
+            1,
+            2
         )
 
-        self.scan_profile.setStyleSheet(
-            f"""
-            QComboBox {{
-                background-color: #081321;
-                color: {COLOR_TEXT};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 5px;
-                padding-left: 8px;
-                font-size: 11px;
-            }}
+        # Timeout
 
-            QComboBox:hover {{
-                border: 1px solid {COLOR_CYAN};
-            }}
-
-            QComboBox QAbstractItemView {{
-                background-color: {COLOR_PANEL};
-                color: {COLOR_TEXT};
-                selection-background-color: #12345A;
-                border: 1px solid {COLOR_BORDER};
-            }}
-            """
+        timeout_label = self.create_control_label(
+            "TIMEOUT"
         )
 
-        layout.addWidget(
-            self.scan_profile
+        self.timeout_spin = QSpinBox()
+
+        self.timeout_spin.setRange(
+            1,
+            30
         )
 
-        # ======================================================
-        # SPACER
-        # ======================================================
+        self.timeout_spin.setValue(
+            3
+        )
 
-        layout.addStretch()
+        self.timeout_spin.setSuffix(
+            " sec"
+        )
 
-        # ======================================================
-        # START BUTTON
-        # ======================================================
+        control_layout.addWidget(
+            timeout_label,
+            0,
+            3
+        )
+
+        control_layout.addWidget(
+            self.timeout_spin,
+            1,
+            3
+        )
+
+        # Start
 
         self.start_button = QPushButton(
-            "▶  START SCAN"
+            "START SCAN"
+        )
+
+        self.start_button.setObjectName(
+            "PrimaryButton"
         )
 
         self.start_button.setFixedHeight(
-            BUTTON_HEIGHT
-        )
-
-        self.start_button.setMinimumWidth(
-            125
+            34
         )
 
         self.start_button.setStyleSheet(
-            self.button_style(
-                COLOR_BLUE,
-                hover=COLOR_CYAN
-            )
+            f"""
+            QPushButton {{
+                background: {COLOR_BLUE};
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0 16px;
+                font-size: 10px;
+                font-weight: 700;
+            }}
+
+            QPushButton:hover {{
+                background: {COLOR_BLUE_HOVER};
+            }}
+
+            QPushButton:disabled {{
+                background: #1E3A6F;
+                color: #94A3B8;
+            }}
+            """
         )
 
         self.start_button.clicked.connect(
             self.start_scan
         )
 
-        layout.addWidget(
-            self.start_button
+        control_layout.addWidget(
+            self.start_button,
+            1,
+            4
         )
 
-        # ======================================================
-        # STOP BUTTON
-        # ======================================================
+        # Stop
 
         self.stop_button = QPushButton(
-            "■  STOP"
+            "STOP"
         )
 
         self.stop_button.setFixedHeight(
-            BUTTON_HEIGHT
-        )
-
-        self.stop_button.setMinimumWidth(
-            85
-        )
-
-        self.stop_button.setEnabled(
-            False
+            34
         )
 
         self.stop_button.setStyleSheet(
-            self.button_style(
-                COLOR_RED
-            )
+            f"""
+            QPushButton {{
+                background: #2A1111;
+                color: {COLOR_RED};
+                border: 1px solid #6B1B1B;
+                border-radius: 5px;
+                padding: 0 16px;
+                font-size: 10px;
+                font-weight: 700;
+            }}
+
+            QPushButton:hover {{
+                background: #3A1515;
+            }}
+            """
         )
 
         self.stop_button.clicked.connect(
             self.stop_scan
         )
 
-        layout.addWidget(
-            self.stop_button
+        control_layout.addWidget(
+            self.stop_button,
+            1,
+            5
         )
 
-        return frame
-
-    # ==========================================================
-    # BUTTON STYLE
-    # ==========================================================
-
-    def button_style(
-        self,
-        background,
-        hover=None
-    ):
-
-        if hover is None:
-            hover = background
-
-        return f"""
-        QPushButton {{
-            background-color: {background};
-            color: {COLOR_TEXT};
-            border: 1px solid {background};
-            border-radius: 5px;
-            padding: 0 12px;
-            font-size: 10px;
-            font-weight: 700;
-        }}
-
-        QPushButton:hover {{
-            background-color: {hover};
-        }}
-
-        QPushButton:disabled {{
-            background-color: #17263B;
-            color: {COLOR_MUTED};
-            border: 1px solid {COLOR_BORDER};
-        }}
-        """
-
-    # ==========================================================
-    # SCAN STATUS
-    # ==========================================================
-
-    def create_scan_status(self):
-
-        frame = QFrame()
-
-        frame.setFixedHeight(
-            STATUS_HEIGHT
+        main_layout.addWidget(
+            control_panel
         )
 
-        frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {COLOR_PANEL};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 7px;
-            }}
-            """
-        )
+        # ----------------------------------------------------
+        # STATUS CARDS
+        # ----------------------------------------------------
 
-        layout = QVBoxLayout(
-            frame
-        )
+        status_layout = QHBoxLayout()
 
-        layout.setContentsMargins(
-            12,
-            8,
-            12,
-            8
-        )
-
-        layout.setSpacing(
-            6
-        )
-
-        # ======================================================
-        # TOP STATUS
-        # ======================================================
-
-        top = QHBoxLayout()
-
-        # ------------------------------------------------------
-        # Status
-        # ------------------------------------------------------
-
-        self.status_label = QLabel(
-            "● READY"
-        )
-
-        self.status_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_GREEN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        top.addWidget(
-            self.status_label
-        )
-
-        top.addStretch()
-
-        # ------------------------------------------------------
-        # Hosts
-        # ------------------------------------------------------
-
-        self.host_count_label = QLabel(
+        self.host_count_label = self.create_status_badge(
             "Hosts: 0"
         )
 
-        top.addWidget(
-            self.create_status_counter(
-                self.host_count_label
-            )
-        )
-
-        # ------------------------------------------------------
-        # Ports
-        # ------------------------------------------------------
-
-        self.port_count_label = QLabel(
+        self.open_ports_label = self.create_status_badge(
             "Open Ports: 0"
         )
 
-        top.addWidget(
-            self.create_status_counter(
-                self.port_count_label
-            )
-        )
-
-        # ------------------------------------------------------
-        # Findings
-        # ------------------------------------------------------
-
-        self.finding_count_label = QLabel(
+        self.findings_label = self.create_status_badge(
             "Findings: 0"
         )
 
-        top.addWidget(
-            self.create_status_counter(
-                self.finding_count_label
-            )
-        )
-
-        # ------------------------------------------------------
-        # Risk
-        # ------------------------------------------------------
-
-        self.risk_label = QLabel(
+        self.risk_label = self.create_status_badge(
             "Risk: LOW"
         )
 
-        self.risk_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_GREEN};
-                font-size: 11px;
-                font-weight: 700;
-                padding-left: 14px;
-            }}
-            """
+        status_layout.addWidget(
+            self.host_count_label
         )
 
-        top.addWidget(
+        status_layout.addWidget(
+            self.open_ports_label
+        )
+
+        status_layout.addWidget(
+            self.findings_label
+        )
+
+        status_layout.addWidget(
             self.risk_label
         )
 
-        layout.addLayout(
-            top
+        status_layout.addStretch()
+
+        main_layout.addLayout(
+            status_layout
         )
 
-        # ======================================================
+        # ----------------------------------------------------
         # PROGRESS
-        # ======================================================
+        # ----------------------------------------------------
 
-        self.scan_progress = QProgressBar()
+        self.progress_bar = QProgressBar()
 
-        self.scan_progress.setRange(
+        self.progress_bar.setRange(
             0,
             100
         )
 
-        self.scan_progress.setValue(
+        self.progress_bar.setValue(
             0
         )
 
-        self.scan_progress.setTextVisible(
+        self.progress_bar.setTextVisible(
             False
         )
 
-        self.scan_progress.setFixedHeight(
-            8
+        self.progress_bar.setFixedHeight(
+            5
         )
 
-        self.scan_progress.setStyleSheet(
+        self.progress_bar.setStyleSheet(
             f"""
             QProgressBar {{
-                background-color: #17263B;
+                background: {COLOR_PANEL_2};
                 border: none;
-                border-radius: 4px;
+                border-radius: 3px;
             }}
 
             QProgressBar::chunk {{
-                background-color: {COLOR_CYAN};
-                border-radius: 4px;
+                background: {COLOR_BLUE};
+                border-radius: 3px;
             }}
             """
         )
 
-        layout.addWidget(
-            self.scan_progress
+        main_layout.addWidget(
+            self.progress_bar
         )
 
-        return frame
-
-    # ==========================================================
-    # STATUS COUNTER
-    # ==========================================================
-
-    def create_status_counter(
-        self,
-        label
-    ):
-
-        label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 11px;
-                padding-left: 14px;
-            }}
-            """
-        )
-
-        return label
-
-    # ==========================================================
-    # TABS
-    # ==========================================================
-
-    def create_tabs(self):
+        # ----------------------------------------------------
+        # TABS
+        # ----------------------------------------------------
 
         self.tabs = QTabWidget()
 
-        self.tabs.setObjectName(
-            "ndmTabs"
+        self.tabs.setDocumentMode(
+            True
         )
+        self.tabs.setAutoFillBackground(True)
+        tabs_palette = self.tabs.palette()
+        tabs_palette.setColor(tabs_palette.ColorRole.Window, QColor(COLOR_BG))
+        tabs_palette.setColor(tabs_palette.ColorRole.Base, QColor(COLOR_BG))
+        self.tabs.setPalette(tabs_palette)
 
         self.tabs.setStyleSheet(
             f"""
             QTabWidget::pane {{
-                background-color: {COLOR_PANEL};
                 border: 1px solid {COLOR_BORDER};
-                border-radius: 7px;
-                top: -1px;
+                background: {COLOR_BG};
+                border-radius: 5px;
             }}
 
             QTabBar::tab {{
-                background-color: #081321;
+                background: {COLOR_PANEL};
                 color: {COLOR_SECONDARY};
-                border: 1px solid {COLOR_BORDER};
-                padding: 8px 15px;
+                padding: 9px 14px;
                 margin-right: 2px;
-                font-size: 10px;
-            }}
-
-            QTabBar::tab:selected {{
-                background-color: {COLOR_PANEL};
-                color: {COLOR_CYAN};
-                border-bottom-color: {COLOR_PANEL};
+                border: 1px solid {COLOR_BORDER};
+                border-bottom: none;
+                font-size: 9px;
+                font-weight: 600;
             }}
 
             QTabBar::tab:hover {{
                 color: {COLOR_TEXT};
+                background: #172033;
+            }}
+
+            QTabBar::tab:selected {{
+                color: white;
+                background: {COLOR_BLUE};
+                border-color: {COLOR_BLUE};
             }}
             """
         )
 
-        # ------------------------------------------------------
-        # Dashboard
-        # ------------------------------------------------------
+        main_layout.addWidget(
+            self.tabs
+        )
+
+        self.create_tabs()
+        self._apply_tab_page_backgrounds()
+
+    def _apply_tab_page_backgrounds(self):
+        """Force each tab page's empty area to use the dark application theme."""
+        for index in range(self.tabs.count()):
+            page = self.tabs.widget(index)
+            if page is None:
+                continue
+
+            page.setObjectName(f"NDMTabPage{index}")
+            page.setAutoFillBackground(True)
+
+            palette = page.palette()
+            palette.setColor(palette.ColorRole.Window, QColor(COLOR_BG))
+            palette.setColor(palette.ColorRole.Base, QColor(COLOR_BG))
+            palette.setColor(palette.ColorRole.Text, QColor(COLOR_TEXT))
+            page.setPalette(palette)
+
+            # Target only the tab-page root. Nested cards/tables keep their own styles.
+            page.setStyleSheet(
+                f"QWidget#NDMTabPage{index} {{"
+                f"background-color: {COLOR_BG}; color: {COLOR_TEXT};"
+                "}"
+            )
+
+
+    # ========================================================
+    # CREATE TABS
+    # ========================================================
+
+    def create_tabs(self):
 
         self.tabs.addTab(
             self.create_dashboard_tab(),
             "Dashboard"
         )
 
-        # ------------------------------------------------------
-        # Hosts
-        # ------------------------------------------------------
-
         self.tabs.addTab(
             self.create_hosts_tab(),
             "Hosts"
         )
-
-        # ------------------------------------------------------
-        # Ports
-        # ------------------------------------------------------
 
         self.tabs.addTab(
             self.create_ports_tab(),
             "Ports"
         )
 
-        # ------------------------------------------------------
-        # Vulnerabilities
-        # ------------------------------------------------------
+        self.tabs.addTab(
+            self.create_services_tab(),
+            "Services"
+        )
 
         self.tabs.addTab(
             self.create_vulnerabilities_tab(),
             "Vulnerabilities"
         )
 
-        # ------------------------------------------------------
-        # Topology
-        # ------------------------------------------------------
+        self.tabs.addTab(
+            self.create_threat_intelligence_tab(),
+            "Threat Intelligence"
+        )
 
         self.tabs.addTab(
             self.create_topology_tab(),
             "Topology"
         )
 
-        # ------------------------------------------------------
-        # Reports
-        # ------------------------------------------------------
-
         self.tabs.addTab(
             self.create_reports_tab(),
             "Reports"
         )
 
-        return self.tabs
-
-    # ==========================================================
+    # ========================================================
     # DASHBOARD TAB
-    # ==========================================================
+    # ========================================================
 
     def create_dashboard_tab(self):
 
@@ -942,318 +768,172 @@ class NDMScannerPage(QWidget):
         )
 
         layout.setContentsMargins(
-            12,
-            12,
-            12,
-            12
-        )
-
-        layout.setSpacing(
+            10,
+            10,
+            10,
             10
         )
 
-        # ======================================================
-        # METRICS
-        # ======================================================
-
-        metrics = QHBoxLayout()
-
-        metrics.setSpacing(
-            8
+        layout.setSpacing(
+            12
         )
 
-        self.device_metric = (
-            self.create_metric_card(
-                "DEVICES",
-                "0",
-                COLOR_CYAN
-            )
+        metrics = QGridLayout()
+
+        self.metric_devices = self.create_metric_card(
+            "DEVICES",
+            "0",
+            COLOR_BLUE
         )
 
-        self.open_port_metric = (
-            self.create_metric_card(
-                "OPEN PORTS",
-                "0",
-                COLOR_BLUE
-            )
+        self.metric_ports = self.create_metric_card(
+            "OPEN PORTS",
+            "0",
+            COLOR_CYAN
         )
 
-        self.high_metric = (
-            self.create_metric_card(
-                "HIGH RISK",
-                "0",
-                COLOR_RED
-            )
+        self.metric_high = self.create_metric_card(
+            "HIGH RISK",
+            "0",
+            COLOR_RED
         )
 
-        self.medium_metric = (
-            self.create_metric_card(
-                "MEDIUM RISK",
-                "0",
-                COLOR_YELLOW
-            )
+        self.metric_medium = self.create_metric_card(
+            "MEDIUM RISK",
+            "0",
+            COLOR_YELLOW
         )
 
-        self.score_metric = (
-            self.create_metric_card(
-                "SECURITY SCORE",
-                "100",
-                COLOR_GREEN
-            )
+        self.metric_score = self.create_metric_card(
+            "SECURITY SCORE",
+            "100",
+            COLOR_GREEN
         )
 
         metrics.addWidget(
-            self.device_metric
+            self.metric_devices,
+            0,
+            0
         )
 
         metrics.addWidget(
-            self.open_port_metric
+            self.metric_ports,
+            0,
+            1
         )
 
         metrics.addWidget(
-            self.high_metric
+            self.metric_high,
+            0,
+            2
         )
 
         metrics.addWidget(
-            self.medium_metric
+            self.metric_medium,
+            0,
+            3
         )
 
         metrics.addWidget(
-            self.score_metric
+            self.metric_score,
+            0,
+            4
         )
 
         layout.addLayout(
             metrics
         )
 
-        # ======================================================
-        # SECURITY SCORE PANEL
-        # ======================================================
+        # Summary
 
-        score_panel = QFrame()
+        summary_frame = self.create_panel()
 
-        score_panel.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {COLOR_PANEL_DARK};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 7px;
-            }}
-            """
+        summary_layout = QVBoxLayout(
+            summary_frame
+        )
+        summary_layout.setContentsMargins(10, 10, 10, 10)
+        summary_layout.setSpacing(8)
+
+        summary_title = self.create_section_title(
+            "SCAN SUMMARY"
         )
 
-        score_layout = QHBoxLayout(
-            score_panel
+        summary_layout.addWidget(
+            summary_title
         )
 
-        score_layout.setContentsMargins(
-            16,
-            12,
-            16,
-            12
+        self.summary_text = QTextEdit()
+
+        self.summary_text.setReadOnly(
+            True
+        )
+        self.summary_text.setMinimumHeight(120)
+        self.summary_text.setMaximumHeight(190)
+        self.summary_text.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.summary_text.setStyleSheet(
+            "QTextEdit { background:#0B1424; color:#D7E3F4; "
+            "border:1px solid #263449; border-radius:6px; "
+            "padding:10px; font-family:Consolas; font-size:10px; }"
         )
 
-        # ------------------------------------------------------
-        # Score
-        # ------------------------------------------------------
-
-        score_title = QLabel(
-            "NETWORK SECURITY SCORE"
-        )
-
-        score_title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 11px;
-                font-weight: 600;
-            }}
-            """
-        )
-
-        score_layout.addWidget(
-            score_title
-        )
-
-        score_layout.addStretch()
-
-        self.large_score = QLabel(
-            "100 / 100"
-        )
-
-        self.large_score.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_GREEN};
-                font-size: 26px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        score_layout.addWidget(
-            self.large_score
-        )
-
-        self.large_score_status = QLabel(
-            " SAFE"
-        )
-
-        self.large_score_status.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_GREEN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        score_layout.addWidget(
-            self.large_score_status
+        summary_layout.addWidget(
+            self.summary_text
         )
 
         layout.addWidget(
-            score_panel
+            summary_frame
         )
 
-        # ======================================================
-        # FINDINGS SUMMARY
-        # ======================================================
+        # Findings
 
-        findings_title = QLabel(
+        findings_frame = self.create_panel()
+
+        findings_layout = QVBoxLayout(
+            findings_frame
+        )
+        findings_layout.setContentsMargins(10, 10, 10, 10)
+        findings_layout.setSpacing(8)
+
+        findings_title = self.create_section_title(
             "SECURITY FINDINGS"
         )
 
-        findings_title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 11px;
-                font-weight: 700;
-                padding-top: 5px;
-            }}
-            """
-        )
-
-        layout.addWidget(
+        findings_layout.addWidget(
             findings_title
         )
 
-        self.summary_label = QLabel(
-            "No security findings detected."
+        self.dashboard_findings = QTableWidget()
+
+        self.dashboard_findings.setColumnCount(
+            4
         )
 
-        self.summary_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 11px;
-                padding: 8px;
-                background-color: {COLOR_PANEL_DARK};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 6px;
-            }}
-            """
+        self.dashboard_findings.setHorizontalHeaderLabels(
+            [
+                "Severity",
+                "Host",
+                "Finding",
+                "Status",
+            ]
         )
 
-        self.summary_label.setWordWrap(
-            True
+        self.configure_table(
+            self.dashboard_findings
+        )
+
+        findings_layout.addWidget(
+            self.dashboard_findings
         )
 
         layout.addWidget(
-            self.summary_label
+            findings_frame
         )
-
-        layout.addStretch()
 
         return widget
 
-    # ==========================================================
-    # METRIC CARD
-    # ==========================================================
-
-    def create_metric_card(
-        self,
-        title,
-        value,
-        accent
-    ):
-
-        card = QFrame()
-
-        card.setMinimumHeight(
-            78
-        )
-
-        card.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {COLOR_PANEL_DARK};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 7px;
-            }}
-            """
-        )
-
-        layout = QVBoxLayout(
-            card
-        )
-
-        layout.setContentsMargins(
-            12,
-            8,
-            12,
-            8
-        )
-
-        layout.setSpacing(
-            3
-        )
-
-        title_label = QLabel(
-            title
-        )
-
-        title_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 9px;
-                font-weight: 600;
-            }}
-            """
-        )
-
-        layout.addWidget(
-            title_label
-        )
-
-        value_label = QLabel(
-            value
-        )
-
-        value_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {accent};
-                font-size: 22px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        layout.addWidget(
-            value_label
-        )
-
-        card.value_label = value_label
-
-        return card
-
-    # ==========================================================
+    # ========================================================
     # HOSTS TAB
-    # ==========================================================
+    # ========================================================
 
     def create_hosts_tab(self):
 
@@ -1270,62 +950,34 @@ class NDMScannerPage(QWidget):
             10
         )
 
-        title = QLabel(
-            "DISCOVERED HOSTS"
-        )
-
-        title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 11px;
-                font-weight: 700;
-            }}
-            """
-        )
-
         layout.addWidget(
-            title
+            self.create_section_title(
+                "NETWORK HOSTS"
+            )
         )
 
         self.host_table = QTableWidget()
 
         self.host_table.setColumnCount(
-            6
+            8
         )
 
         self.host_table.setHorizontalHeaderLabels(
             [
                 "IP Address",
-                "Hostname",
                 "MAC Address",
+                "Hostname",
                 "Vendor",
                 "Status",
                 "Latency",
+                "Open Ports",
+                "Risk",
             ]
         )
 
         self.configure_table(
             self.host_table
         )
-
-        widths = [
-            HOST_IP_WIDTH,
-            HOSTNAME_WIDTH,
-            MAC_WIDTH,
-            VENDOR_WIDTH,
-            STATUS_WIDTH,
-            LATENCY_WIDTH,
-        ]
-
-        for index, width in enumerate(
-            widths
-        ):
-
-            self.host_table.setColumnWidth(
-                index,
-                width
-            )
 
         self.host_table.itemSelectionChanged.connect(
             self.on_host_selected
@@ -1337,9 +989,9 @@ class NDMScannerPage(QWidget):
 
         return widget
 
-    # ==========================================================
+    # ========================================================
     # PORTS TAB
-    # ==========================================================
+    # ========================================================
 
     def create_ports_tab(self):
 
@@ -1356,37 +1008,27 @@ class NDMScannerPage(QWidget):
             10
         )
 
-        title = QLabel(
-            "OPEN SERVICES & PORTS"
-        )
-
-        title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 11px;
-                font-weight: 700;
-            }}
-            """
-        )
-
         layout.addWidget(
-            title
+            self.create_section_title(
+                "OPEN PORTS"
+            )
         )
 
         self.port_table = QTableWidget()
 
         self.port_table.setColumnCount(
-            5
+            7
         )
 
         self.port_table.setHorizontalHeaderLabels(
             [
                 "Host",
                 "Port",
+                "Protocol",
                 "Service",
-                "Version",
+                "State",
                 "Risk",
+                "Banner",
             ]
         )
 
@@ -1394,32 +1036,94 @@ class NDMScannerPage(QWidget):
             self.port_table
         )
 
-        widths = [
-            PORT_HOST_WIDTH,
-            PORT_WIDTH,
-            SERVICE_WIDTH,
-            VERSION_WIDTH,
-            RISK_WIDTH,
-        ]
-
-        for index, width in enumerate(
-            widths
-        ):
-
-            self.port_table.setColumnWidth(
-                index,
-                width
-            )
-
         layout.addWidget(
             self.port_table
         )
 
         return widget
 
-    # ==========================================================
-    # VULNERABILITIES TAB
-    # ==========================================================
+    # ========================================================
+    # SERVICES TAB
+    # ========================================================
+
+    def create_services_tab(self):
+
+        widget = QWidget()
+
+        layout = QVBoxLayout(
+            widget
+        )
+
+        layout.setContentsMargins(
+            10,
+            10,
+            10,
+            10
+        )
+
+        header = QHBoxLayout()
+
+        header.addWidget(
+            self.create_section_title(
+                "SERVICE DETECTION"
+            )
+        )
+
+        header.addStretch()
+
+        self.service_summary = QLabel(
+            "Services: 0"
+        )
+
+        self.service_summary.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 10px;
+                font-weight: 600;
+            }}
+            """
+        )
+
+        header.addWidget(
+            self.service_summary
+        )
+
+        layout.addLayout(
+            header
+        )
+
+        self.service_table = QTableWidget()
+
+        self.service_table.setColumnCount(
+            7
+        )
+
+        self.service_table.setHorizontalHeaderLabels(
+            [
+                "Host",
+                "Port",
+                "Protocol",
+                "Service",
+                "Version",
+                "State",
+                "Risk",
+            ]
+        )
+
+        self.configure_table(
+            self.service_table
+        )
+
+        layout.addWidget(
+            self.service_table
+        )
+
+        return widget
+
+    # ========================================================
+    # VULNERABILITY TAB
+    # ========================================================
 
     def create_vulnerabilities_tab(self):
 
@@ -1436,130 +1140,82 @@ class NDMScannerPage(QWidget):
             10
         )
 
-        # ------------------------------------------------------
-        # Header
-        # ------------------------------------------------------
+        counters = QHBoxLayout()
 
-        header = QHBoxLayout()
-
-        title = QLabel(
-            "VULNERABILITY ASSESSMENT"
-        )
-
-        title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 11px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        header.addWidget(
-            title
-        )
-
-        header.addStretch()
-
-        self.critical_count = QLabel(
-            "CRITICAL 0"
-        )
-
-        self.high_count = QLabel(
-            "HIGH 0"
-        )
-
-        self.medium_count = QLabel(
-            "MEDIUM 0"
-        )
-
-        self.low_count = QLabel(
-            "LOW 0"
-        )
-
-        self.set_severity_style(
-            self.critical_count,
+        self.critical_count = self.create_small_counter(
+            "CRITICAL",
+            "0",
             COLOR_RED
         )
 
-        self.set_severity_style(
-            self.high_count,
+        self.high_count = self.create_small_counter(
+            "HIGH",
+            "0",
             COLOR_ORANGE
         )
 
-        self.set_severity_style(
-            self.medium_count,
+        self.medium_count = self.create_small_counter(
+            "MEDIUM",
+            "0",
             COLOR_YELLOW
         )
 
-        self.set_severity_style(
-            self.low_count,
+        self.low_count = self.create_small_counter(
+            "LOW",
+            "0",
             COLOR_GREEN
         )
 
-        header.addWidget(
+        counters.addWidget(
             self.critical_count
         )
 
-        header.addWidget(
+        counters.addWidget(
             self.high_count
         )
 
-        header.addWidget(
+        counters.addWidget(
             self.medium_count
         )
 
-        header.addWidget(
+        counters.addWidget(
             self.low_count
         )
 
+        counters.addStretch()
+
         layout.addLayout(
-            header
+            counters
         )
 
-        # ------------------------------------------------------
-        # Vulnerability table
-        # ------------------------------------------------------
+        layout.addWidget(
+            self.create_section_title(
+                "VULNERABILITY FINDINGS"
+            )
+        )
 
         self.vulnerability_table = QTableWidget()
 
         self.vulnerability_table.setColumnCount(
-            6
+            8
         )
 
         self.vulnerability_table.setHorizontalHeaderLabels(
             [
+                "Severity",
                 "Host",
                 "Port",
                 "Service",
                 "Finding",
-                "Severity",
-                "Confidence",
+                "Evidence",
+                "Risk Score",
+                "Status",
             ]
         )
 
         self.configure_table(
             self.vulnerability_table
         )
-
-        widths = [
-            VULN_HOST_WIDTH,
-            VULN_PORT_WIDTH,
-            VULN_SERVICE_WIDTH,
-            VULN_FINDING_WIDTH,
-            VULN_SEVERITY_WIDTH,
-            VULN_CONFIDENCE_WIDTH,
-        ]
-
-        for index, width in enumerate(
-            widths
-        ):
-
-            self.vulnerability_table.setColumnWidth(
-                index,
-                width
-            )
 
         self.vulnerability_table.itemSelectionChanged.connect(
             self.on_vulnerability_selected
@@ -1571,9 +1227,180 @@ class NDMScannerPage(QWidget):
 
         return widget
 
-    # ==========================================================
+    # ========================================================
+    # THREAT INTELLIGENCE TAB
+    # ========================================================
+
+    def create_threat_intelligence_tab(self):
+
+        widget = QWidget()
+
+        layout = QVBoxLayout(
+            widget
+        )
+
+        layout.setContentsMargins(
+            10,
+            10,
+            10,
+            10
+        )
+
+        header = QHBoxLayout()
+
+        header.addWidget(
+            self.create_section_title(
+                "THREAT INTELLIGENCE"
+            )
+        )
+
+        header.addStretch()
+
+        self.threat_summary = QLabel(
+            "Indicators: 0"
+        )
+
+        self.threat_summary.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 10px;
+                font-weight: 600;
+            }}
+            """
+        )
+
+        header.addWidget(
+            self.threat_summary
+        )
+
+        layout.addLayout(
+            header
+        )
+
+        # Reputation
+
+        reputation_frame = self.create_panel()
+
+        reputation_layout = QGridLayout(
+            reputation_frame
+        )
+
+        reputation_title = self.create_section_title(
+            "REPUTATION OVERVIEW"
+        )
+
+        reputation_layout.addWidget(
+            reputation_title,
+            0,
+            0,
+            1,
+            4
+        )
+
+        self.safe_indicator = self.create_reputation_card(
+            "SAFE",
+            "0",
+            COLOR_GREEN
+        )
+
+        self.suspicious_indicator = self.create_reputation_card(
+            "SUSPICIOUS",
+            "0",
+            COLOR_YELLOW
+        )
+
+        self.malicious_indicator = self.create_reputation_card(
+            "MALICIOUS",
+            "0",
+            COLOR_RED
+        )
+
+        self.unknown_indicator = self.create_reputation_card(
+            "UNKNOWN",
+            "0",
+            COLOR_SECONDARY
+        )
+
+        reputation_layout.addWidget(
+            self.safe_indicator,
+            1,
+            0
+        )
+
+        reputation_layout.addWidget(
+            self.suspicious_indicator,
+            1,
+            1
+        )
+
+        reputation_layout.addWidget(
+            self.malicious_indicator,
+            1,
+            2
+        )
+
+        reputation_layout.addWidget(
+            self.unknown_indicator,
+            1,
+            3
+        )
+
+        layout.addWidget(
+            reputation_frame
+        )
+
+        # Table
+
+        self.threat_table = QTableWidget()
+
+        self.threat_table.setColumnCount(
+            8
+        )
+
+        self.threat_table.setHorizontalHeaderLabels(
+            [
+                "Indicator",
+                "Type",
+                "Country",
+                "Reputation",
+                "Confidence",
+                "Source",
+                "First Seen",
+                "Status",
+            ]
+        )
+
+        self.configure_table(
+            self.threat_table
+        )
+
+        layout.addWidget(
+            self.threat_table
+        )
+
+        disclaimer = QLabel(
+            "Threat intelligence is an assessment indicator and does not by itself prove malicious activity."
+        )
+
+        disclaimer.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_MUTED};
+                font-size: 9px;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            disclaimer
+        )
+
+        return widget
+
+    # ========================================================
     # TOPOLOGY TAB
-    # ==========================================================
+    # ========================================================
 
     def create_topology_tab(self):
 
@@ -1584,204 +1411,418 @@ class NDMScannerPage(QWidget):
         )
 
         layout.setContentsMargins(
-            15,
-            15,
-            15,
-            15
+            10,
+            10,
+            10,
+            10
         )
 
-        title = QLabel(
-            "NETWORK TOPOLOGY"
+        layout.setSpacing(
+            10
         )
 
-        title.setStyleSheet(
+        # ----------------------------------------------------
+        # Header
+        # ----------------------------------------------------
+
+        header = QHBoxLayout()
+
+        header.addWidget(
+            self.create_section_title(
+                "NETWORK TOPOLOGY"
+            )
+        )
+
+        header.addStretch()
+
+        topology_info = QLabel(
+            "3 Hosts  •  15 Open Ports  •  2 Findings"
+        )
+
+        topology_info.setStyleSheet(
             f"""
             QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 12px;
-                font-weight: 700;
+                color: {COLOR_SECONDARY};
+                font-size: 9px;
+                font-weight: 600;
             }}
             """
         )
 
-        layout.addWidget(
-            title
+        header.addWidget(
+            topology_info
         )
 
-        topology = QFrame()
+        layout.addLayout(
+            header
+        )
 
-        topology.setStyleSheet(
+        # ----------------------------------------------------
+        # Scroll Area
+        # ----------------------------------------------------
+
+        scroll = QScrollArea()
+
+        scroll.setWidgetResizable(
+            True
+        )
+
+        scroll.setFrameShape(
+            QFrame.NoFrame
+        )
+
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+
+        scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+
+        # ----------------------------------------------------
+        # Canvas
+        # ----------------------------------------------------
+
+        canvas = QFrame()
+
+        canvas.setMinimumSize(
+            900,
+            650
+        )
+
+        canvas.setStyleSheet(
             f"""
             QFrame {{
-                background-color: {COLOR_PANEL_DARK};
+                background: {COLOR_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 8px;
             }}
             """
         )
 
-        topology_layout = QVBoxLayout(
-            topology
+        canvas_layout = QVBoxLayout(
+            canvas
         )
 
-        topology_layout.setAlignment(
-            Qt.AlignCenter
+        canvas_layout.setContentsMargins(
+            30,
+            25,
+            30,
+            25
         )
 
-        # ------------------------------------------------------
+        canvas_layout.setSpacing(
+            0
+        )
+
+        # ----------------------------------------------------
         # Internet
-        # ------------------------------------------------------
+        # ----------------------------------------------------
 
-        internet = self.create_topology_node(
+        internet_row = QHBoxLayout()
+
+        internet_row.setAlignment(
+            Qt.AlignCenter
+        )
+
+        internet = self.create_network_node(
             "INTERNET",
-            COLOR_PURPLE
+            "WAN",
+            "PUBLIC NETWORK",
+            COLOR_PURPLE,
+            "ONLINE"
         )
 
-        topology_layout.addWidget(
-            internet,
-            alignment=Qt.AlignCenter
+        internet_row.addWidget(
+            internet
         )
 
-        arrow1 = QLabel(
-            "│\n▼"
+        canvas_layout.addLayout(
+            internet_row
         )
 
-        arrow1.setAlignment(
-            Qt.AlignCenter
+        canvas_layout.addWidget(
+            self.create_topology_connector()
         )
 
-        arrow1.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 15px;
-            }}
-            """
-        )
-
-        topology_layout.addWidget(
-            arrow1
-        )
-
-        # ------------------------------------------------------
+        # ----------------------------------------------------
         # Router
-        # ------------------------------------------------------
+        # ----------------------------------------------------
 
-        router = self.create_topology_node(
-            "ROUTER\n192.168.1.1",
-            COLOR_CYAN
-        )
+        router_row = QHBoxLayout()
 
-        topology_layout.addWidget(
-            router,
-            alignment=Qt.AlignCenter
-        )
-
-        arrow2 = QLabel(
-            "│\n▼"
-        )
-
-        arrow2.setAlignment(
+        router_row.setAlignment(
             Qt.AlignCenter
         )
 
-        arrow2.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 15px;
-            }}
-            """
+        router = self.create_network_node(
+            "ROUTER",
+            "192.168.1.1",
+            "Default Gateway",
+            COLOR_BLUE,
+            "ONLINE"
         )
 
-        topology_layout.addWidget(
-            arrow2
+        router_row.addWidget(
+            router
         )
 
-        # ------------------------------------------------------
-        # Devices
-        # ------------------------------------------------------
-
-        devices = QHBoxLayout()
-
-        for name, ip, color in [
-            (
-                "LAPTOP",
-                "192.168.1.10",
-                COLOR_GREEN
-            ),
-            (
-                "DESKTOP",
-                "192.168.1.12",
-                COLOR_BLUE
-            ),
-            (
-                "PRINTER",
-                "192.168.1.20",
-                COLOR_YELLOW
-            ),
-        ]:
-
-            devices.addWidget(
-                self.create_topology_node(
-                    f"{name}\n{ip}",
-                    color
-                )
-            )
-
-        topology_layout.addLayout(
-            devices
+        canvas_layout.addLayout(
+            router_row
         )
 
-        layout.addWidget(
-            topology,
-            1
+        canvas_layout.addWidget(
+            self.create_topology_connector()
         )
 
-        return widget
+        # ----------------------------------------------------
+        # Local Network
+        # ----------------------------------------------------
 
-    # ==========================================================
-    # TOPOLOGY NODE
-    # ==========================================================
+        network_row = QHBoxLayout()
 
-    def create_topology_node(
-        self,
-        text,
-        color
-    ):
-
-        node = QLabel(
-            text
-        )
-
-        node.setAlignment(
+        network_row.setAlignment(
             Qt.AlignCenter
         )
 
-        node.setMinimumSize(
-            150,
-            55
+        network = self.create_network_node(
+            "LOCAL NETWORK",
+            "192.168.1.0/24",
+            "LAN / Wi-Fi",
+            COLOR_CYAN,
+            "ACTIVE"
         )
 
-        node.setStyleSheet(
+        network_row.addWidget(
+            network
+        )
+
+        canvas_layout.addLayout(
+            network_row
+        )
+
+        canvas_layout.addWidget(
+            self.create_topology_connector()
+        )
+
+        # ----------------------------------------------------
+        # Devices title
+        # ----------------------------------------------------
+
+        devices_title = QLabel(
+            "DISCOVERED DEVICES"
+        )
+
+        devices_title.setAlignment(
+            Qt.AlignCenter
+        )
+
+        devices_title.setStyleSheet(
             f"""
             QLabel {{
-                background-color: #081321;
-                color: {color};
-                border: 1px solid {color};
-                border-radius: 7px;
-                font-size: 10px;
+                color: {COLOR_SECONDARY};
+                font-size: 9px;
                 font-weight: 700;
                 padding: 8px;
             }}
             """
         )
 
-        return node
+        canvas_layout.addWidget(
+            devices_title
+        )
 
-    # ==========================================================
+        # ----------------------------------------------------
+        # Hosts
+        # ----------------------------------------------------
+
+        hosts_row = QHBoxLayout()
+
+        hosts_row.setSpacing(
+            18
+        )
+
+        hosts_row.setAlignment(
+            Qt.AlignCenter
+        )
+
+        server = self.create_network_node(
+            "SERVER",
+            "192.168.1.12",
+            "server.local",
+            COLOR_YELLOW,
+            "ONLINE",
+            [
+                "6 Open Ports",
+                "SSH :22",
+                "SMB :445",
+                "RISK: MEDIUM",
+            ]
+        )
+
+        windows_pc = self.create_network_node(
+            "WINDOWS PC",
+            "192.168.1.20",
+            "windows-pc",
+            COLOR_GREEN,
+            "ONLINE",
+            [
+                "3 Open Ports",
+                "RDP :3389",
+                "HTTP :80",
+                "RISK: LOW",
+            ]
+        )
+
+        device = self.create_network_node(
+            "DEVICE",
+            "192.168.1.25",
+            "network-device",
+            COLOR_GREEN,
+            "ONLINE",
+            [
+                "2 Open Ports",
+                "HTTPS :443",
+                "DNS :53",
+                "RISK: LOW",
+            ]
+        )
+
+        hosts_row.addWidget(
+            server
+        )
+
+        hosts_row.addWidget(
+            windows_pc
+        )
+
+        hosts_row.addWidget(
+            device
+        )
+
+        canvas_layout.addLayout(
+            hosts_row
+        )
+
+        # ----------------------------------------------------
+        # Findings
+        # ----------------------------------------------------
+
+        canvas_layout.addSpacing(
+            25
+        )
+
+        findings_title = QLabel(
+            "SECURITY FINDINGS"
+        )
+
+        findings_title.setAlignment(
+            Qt.AlignCenter
+        )
+
+        findings_title.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_RED};
+                font-size: 9px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        canvas_layout.addWidget(
+            findings_title
+        )
+
+        findings_row = QHBoxLayout()
+
+        findings_row.setAlignment(
+            Qt.AlignCenter
+        )
+
+        finding1 = self.create_finding_node(
+            "HIGH",
+            "SMB EXPOSED",
+            "192.168.1.12:445",
+            COLOR_RED
+        )
+
+        finding2 = self.create_finding_node(
+            "MEDIUM",
+            "RDP EXPOSED",
+            "192.168.1.20:3389",
+            COLOR_YELLOW
+        )
+
+        findings_row.addWidget(
+            finding1
+        )
+
+        findings_row.addWidget(
+            finding2
+        )
+
+        canvas_layout.addLayout(
+            findings_row
+        )
+
+        canvas_layout.addStretch()
+
+        # ----------------------------------------------------
+        # Legend
+        # ----------------------------------------------------
+
+        legend = QHBoxLayout()
+
+        legend.setAlignment(
+            Qt.AlignCenter
+        )
+
+        legend.addWidget(
+            self.create_legend(
+                COLOR_GREEN,
+                "Safe"
+            )
+        )
+
+        legend.addWidget(
+            self.create_legend(
+                COLOR_YELLOW,
+                "Medium Risk"
+            )
+        )
+
+        legend.addWidget(
+            self.create_legend(
+                COLOR_RED,
+                "High Risk"
+            )
+        )
+
+        legend.addWidget(
+            self.create_legend(
+                COLOR_PURPLE,
+                "External"
+            )
+        )
+
+        canvas_layout.addLayout(
+            legend
+        )
+
+        scroll.setWidget(
+            canvas
+        )
+
+        layout.addWidget(
+            scroll
+        )
+
+        return widget
+
+    # ========================================================
     # REPORTS TAB
-    # ==========================================================
+    # ========================================================
 
     def create_reports_tab(self):
 
@@ -1792,121 +1833,44 @@ class NDMScannerPage(QWidget):
         )
 
         layout.setContentsMargins(
-            15,
-            15,
-            15,
-            15
-        )
-
-        title = QLabel(
-            "SECURITY REPORT"
-        )
-
-        title.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
+            10,
+            10,
+            10,
+            10
         )
 
         layout.addWidget(
-            title
+            self.create_section_title(
+                "SECURITY REPORT"
+            )
         )
 
-        report = QFrame()
-
-        report.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: {COLOR_PANEL_DARK};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 8px;
-            }}
-            """
-        )
+        report_frame = self.create_panel()
 
         report_layout = QVBoxLayout(
-            report
+            report_frame
         )
 
-        report_layout.setContentsMargins(
-            18,
-            18,
-            18,
-            18
+        self.report_text = QTextEdit()
+
+        self.report_text.setReadOnly(
+            True
         )
-
-        self.report_text = QLabel()
-
-        self.report_text.setText(
-            """
-NDM SECURITY ASSESSMENT
-
-Target Network:
-192.168.1.0/24
-
-Hosts Discovered:
-0
-
-Open Ports:
-0
-
-Security Findings:
-0
-
-Critical:
-0
-
-High:
-0
-
-Medium:
-0
-
-Low:
-0
-
-Security Score:
-100 / 100
-
-Status:
-SAFE
-
-The final report will be generated after
-a real scanner run.
-            """
-        )
-
         self.report_text.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_TEXT};
-                font-size: 12px;
-                line-height: 1.5;
-            }}
-            """
+            "QTextEdit { background:#0B1424; color:#D7E3F4; "
+            "border:1px solid #263449; border-radius:6px; "
+            "padding:12px; font-family:Consolas; font-size:10px; }"
         )
 
         report_layout.addWidget(
             self.report_text
         )
 
-        report_layout.addStretch()
-
-        # ------------------------------------------------------
-        # Export buttons
-        # ------------------------------------------------------
-
-        buttons = QHBoxLayout()
-
-        buttons.addStretch()
-
-        pdf_button = QPushButton(
-            "EXPORT PDF"
+        layout.addWidget(
+            report_frame
         )
+
+        export_layout = QHBoxLayout()
 
         json_button = QPushButton(
             "EXPORT JSON"
@@ -1916,403 +1880,1036 @@ a real scanner run.
             "EXPORT CSV"
         )
 
+        pdf_button = QPushButton(
+            "EXPORT PDF"
+        )
+
         for button in [
-            pdf_button,
             json_button,
             csv_button,
+            pdf_button,
         ]:
 
             button.setFixedHeight(
-                BUTTON_HEIGHT
+                32
             )
 
-            button.setStyleSheet(
-                self.button_style(
-                    COLOR_BORDER
-                )
-            )
-
-            buttons.addWidget(
+            export_layout.addWidget(
                 button
             )
 
-        report_layout.addLayout(
-            buttons
-        )
+        export_layout.addStretch()
 
-        layout.addWidget(
-            report,
-            1
+        layout.addLayout(
+            export_layout
         )
 
         return widget
 
-    # ==========================================================
-    # TABLE CONFIGURATION
-    # ==========================================================
+    # ========================================================
+    # COMMON UI HELPERS
+    # ========================================================
+
+    def create_panel(self):
+
+        frame = QFrame()
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL};
+                color: {COLOR_TEXT};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 7px;
+            }}
+            """
+        )
+
+        return frame
+
+    # ========================================================
+
+    def create_section_title(
+        self,
+        text
+    ):
+
+        label = QLabel(
+            text
+        )
+
+        label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_CYAN};
+                font-size: 10px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        return label
+
+    # ========================================================
+
+    def create_control_label(
+        self,
+        text
+    ):
+
+        label = QLabel(
+            text
+        )
+
+        label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        return label
+
+    # ========================================================
+
+    def create_status_badge(
+        self,
+        text
+    ):
+
+        label = QLabel(
+            text
+        )
+
+        label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                background: {COLOR_PANEL};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 5px;
+                padding: 6px 12px;
+                font-size: 9px;
+                font-weight: 600;
+            }}
+            """
+        )
+
+        return label
+
+    # ========================================================
 
     def configure_table(
         self,
         table
     ):
 
-        table.setMinimumHeight(
-            TABLE_MIN_HEIGHT
-        )
-
-        table.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
+        table.setAlternatingRowColors(
+            True
         )
 
         table.setSelectionBehavior(
-            QAbstractItemView.SelectRows
+            QTableWidget.SelectRows
         )
 
         table.setSelectionMode(
-            QAbstractItemView.SingleSelection
+            QTableWidget.SingleSelection
+        )
+
+        table.setEditTriggers(
+            QTableWidget.NoEditTriggers
         )
 
         table.verticalHeader().setVisible(
             False
         )
+        table.verticalHeader().setDefaultSectionSize(30)
+        table.setShowGrid(False)
+        table.setWordWrap(False)
+        table.verticalHeader().setDefaultSectionSize(30)
+        table.horizontalHeader().setMinimumHeight(34)
 
-        table.verticalHeader().setDefaultSectionSize(
-            TABLE_ROW_HEIGHT
+        table.horizontalHeader().setStretchLastSection(
+            True
         )
 
         table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Interactive
         )
 
-        table.setVerticalScrollBarPolicy(
-            Qt.ScrollBarAsNeeded
-        )
-
-        table.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarAsNeeded
+        table.setSortingEnabled(
+            True
         )
 
         table.setStyleSheet(
             f"""
             QTableWidget {{
-                background-color: {COLOR_PANEL};
+                background: {COLOR_PANEL};
+                alternate-background-color: {COLOR_PANEL_2};
                 color: {COLOR_TEXT};
-                border: none;
+                border: 1px solid {COLOR_BORDER};
                 gridline-color: {COLOR_BORDER};
-                font-size: 11px;
-                selection-background-color: #12345A;
-                selection-color: {COLOR_TEXT};
+                font-size: 9px;
             }}
 
             QTableWidget::item {{
-                padding-left: 8px;
-                padding-right: 8px;
-                border-bottom: 1px solid {COLOR_BORDER};
+                padding: 5px;
             }}
 
             QTableWidget::item:selected {{
-                background-color: #12345A;
+                background: {COLOR_BLUE};
+                color: white;
             }}
 
             QHeaderView::section {{
-                background-color: #0A1627;
-                color: {COLOR_CYAN};
+                background: #172033;
+                color: {COLOR_SECONDARY};
                 border: none;
+                border-right: 1px solid {COLOR_BORDER};
                 border-bottom: 1px solid {COLOR_BORDER};
-                padding: 8px;
-                font-size: 10px;
+                padding: 7px;
+                font-size: 8px;
                 font-weight: 700;
-            }}
-
-            QScrollBar:vertical {{
-                background: #081321;
-                width: 8px;
-            }}
-
-            QScrollBar::handle:vertical {{
-                background: #214968;
-                border-radius: 4px;
-                min-height: 35px;
-            }}
-
-            QScrollBar:horizontal {{
-                background: #081321;
-                height: 8px;
-            }}
-
-            QScrollBar::handle:horizontal {{
-                background: #214968;
-                border-radius: 4px;
-                min-width: 50px;
-            }}
-
-            QScrollBar::add-line,
-            QScrollBar::sub-line {{
-                width: 0px;
-                height: 0px;
             }}
             """
         )
 
-    # ==========================================================
-    # SEVERITY STYLE
-    # ==========================================================
+    # ========================================================
+    # METRIC CARD
+    # ========================================================
 
-    def set_severity_style(
+    def create_metric_card(
         self,
-        label,
+        title,
+        value,
         color
     ):
+
+        frame = QFrame()
+
+        frame.setMinimumHeight(
+            82
+        )
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 7px;
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(
+            frame
+        )
+
+        layout.setContentsMargins(
+            12,
+            9,
+            12,
+            9
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        value_label = QLabel(
+            value
+        )
+
+        value_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {color};
+                font-size: 21px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            title_label
+        )
+
+        layout.addWidget(
+            value_label
+        )
+
+        frame.value_label = value_label
+
+        return frame
+
+    # ========================================================
+    # SMALL COUNTER
+    # ========================================================
+
+    def create_small_counter(
+        self,
+        title,
+        value,
+        color
+    ):
+
+        frame = QFrame()
+
+        frame.setMinimumWidth(
+            120
+        )
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 5px;
+            }}
+            """
+        )
+
+        layout = QHBoxLayout(
+            frame
+        )
+
+        layout.setContentsMargins(
+            8,
+            5,
+            8,
+            5
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        value_label = QLabel(
+            value
+        )
+
+        value_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {color};
+                font-size: 15px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            title_label
+        )
+
+        layout.addStretch()
+
+        layout.addWidget(
+            value_label
+        )
+
+        frame.value_label = value_label
+
+        return frame
+
+    # ========================================================
+    # REPUTATION CARD
+    # ========================================================
+
+    def create_reputation_card(
+        self,
+        title,
+        value,
+        color
+    ):
+
+        frame = QFrame()
+
+        frame.setMinimumHeight(
+            65
+        )
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL_2};
+                border: 1px solid {COLOR_BORDER};
+                border-radius: 5px;
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(
+            frame
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        title_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        value_label = QLabel(
+            value
+        )
+
+        value_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        value_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {color};
+                font-size: 19px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            title_label
+        )
+
+        layout.addWidget(
+            value_label
+        )
+
+        frame.value_label = value_label
+
+        return frame
+
+    # ========================================================
+    # NETWORK TOPOLOGY NODE
+    # ========================================================
+
+    def create_network_node(
+        self,
+        title,
+        address,
+        description,
+        border_color,
+        status,
+        details=None
+    ):
+
+        frame = QFrame()
+
+        frame.setFixedWidth(
+            215
+        )
+
+        if details:
+            frame.setMinimumHeight(
+                155
+            )
+        else:
+            frame.setMinimumHeight(
+                105
+            )
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(
+            frame
+        )
+
+        layout.setContentsMargins(
+            12,
+            9,
+            12,
+            9
+        )
+
+        layout.setSpacing(
+            3
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        title_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {border_color};
+                font-size: 11px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            title_label
+        )
+
+        address_label = QLabel(
+            address
+        )
+
+        address_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        address_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_TEXT};
+                font-size: 10px;
+                font-weight: 600;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            address_label
+        )
+
+        description_label = QLabel(
+            description
+        )
+
+        description_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        description_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            description_label
+        )
+
+        status_label = QLabel(
+            f"● {status}"
+        )
+
+        status_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        status_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {border_color};
+                font-size: 8px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            status_label
+        )
+
+        if details:
+
+            for detail in details:
+
+                detail_label = QLabel(
+                    detail
+                )
+
+                detail_label.setAlignment(
+                    Qt.AlignCenter
+                )
+
+                detail_label.setStyleSheet(
+                    f"""
+                    QLabel {{
+                        color: {COLOR_SECONDARY};
+                        font-size: 8px;
+                    }}
+                    """
+                )
+
+                layout.addWidget(
+                    detail_label
+                )
+
+        return frame
+
+    # ========================================================
+    # TOPOLOGY CONNECTOR
+    # ========================================================
+
+    def create_topology_connector(self):
+
+        wrapper = QWidget()
+
+        wrapper.setFixedHeight(
+            28
+        )
+
+        layout = QHBoxLayout(
+            wrapper
+        )
+
+        layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        layout.setAlignment(
+            Qt.AlignCenter
+        )
+
+        line = QFrame()
+
+        line.setFixedWidth(
+            3
+        )
+
+        line.setFixedHeight(
+            28
+        )
+
+        line.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_BLUE};
+                border: none;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            line
+        )
+
+        return wrapper
+
+    # ========================================================
+    # FINDING NODE
+    # ========================================================
+
+    def create_finding_node(
+        self,
+        severity,
+        title,
+        address,
+        color
+    ):
+
+        frame = QFrame()
+
+        frame.setFixedSize(
+            220,
+            82
+        )
+
+        frame.setStyleSheet(
+            f"""
+            QFrame {{
+                background: {COLOR_PANEL};
+                border: 1px solid {color};
+                border-radius: 7px;
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(
+            frame
+        )
+
+        severity_label = QLabel(
+            severity
+        )
+
+        severity_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        severity_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {color};
+                font-size: 9px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            severity_label
+        )
+
+        title_label = QLabel(
+            title
+        )
+
+        title_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        title_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_TEXT};
+                font-size: 10px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            title_label
+        )
+
+        address_label = QLabel(
+            address
+        )
+
+        address_label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        address_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
+            }}
+            """
+        )
+
+        layout.addWidget(
+            address_label
+        )
+
+        return frame
+
+    # ========================================================
+    # LEGEND
+    # ========================================================
+
+    def create_legend(
+        self,
+        color,
+        text
+    ):
+
+        widget = QWidget()
+
+        layout = QHBoxLayout(
+            widget
+        )
+
+        layout.setContentsMargins(
+            8,
+            4,
+            8,
+            4
+        )
+
+        dot = QLabel(
+            "●"
+        )
+
+        dot.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {color};
+                font-size: 12px;
+            }}
+            """
+        )
+
+        label = QLabel(
+            text
+        )
 
         label.setStyleSheet(
             f"""
             QLabel {{
-                color: {color};
-                font-size: 10px;
-                font-weight: 700;
-                padding-left: 12px;
+                color: {COLOR_SECONDARY};
+                font-size: 8px;
             }}
             """
         )
 
-    # ==========================================================
-    # AUTO NETWORK DETECTION
-    # ==========================================================
+        layout.addWidget(
+            dot
+        )
+
+        layout.addWidget(
+            label
+        )
+
+        return widget
+
+    # ========================================================
+    # STATUS STYLE
+    # ========================================================
+
+    def set_status_style(
+        self,
+        text_color,
+        background,
+        border
+    ):
+
+        self.scan_status.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {text_color};
+                background: {background};
+                border: 1px solid {border};
+                border-radius: 5px;
+                padding: 7px 12px;
+                font-size: 10px;
+                font-weight: 700;
+            }}
+            """
+        )
+
+    # ========================================================
+    # AUTO DETECT
+    # ========================================================
 
     def auto_detect_network(self):
 
-        # ------------------------------------------------------
-        # Backend will provide the real CIDR later.
-        # ------------------------------------------------------
-
-        self.network_input.setText(
+        self.target_input.setText(
             "192.168.1.0/24"
         )
 
-        self.status_label.setText(
-            "● NETWORK DETECTED"
-        )
-
-        self.status_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-    # ==========================================================
+    # ========================================================
     # START SCAN
-    # ==========================================================
+    # ========================================================
 
     def start_scan(self):
 
-        target = (
-            self.network_input.text()
-            .strip()
-        )
-
-        profile = (
-            self.scan_profile.currentText()
-        )
+        target = self.target_input.text().strip()
 
         if not target:
-
-            QMessageBox.warning(
-                self,
-                "NDM Scanner",
-                "Please enter a target network."
-            )
-
             return
 
-        # ------------------------------------------------------
-        # UI state
-        # ------------------------------------------------------
-
-        self.scan_running = True
+        config = {
+            "target": target,
+            "profile": self.profile_combo.currentText(),
+            "timeout": self.timeout_spin.value(),
+        }
 
         self.start_button.setEnabled(
             False
         )
 
-        self.stop_button.setEnabled(
-            True
-        )
-
-        self.status_label.setText(
+        self.scan_status.setText(
             "● SCANNING"
         )
 
-        self.status_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_CYAN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
+        self.set_status_style(
+            COLOR_YELLOW,
+            "#2A230D",
+            "#6B5A13"
         )
 
-        self.scan_progress.setValue(
-            5
+        self.progress_bar.setValue(
+            10
         )
-
-        # ------------------------------------------------------
-        # Send request to backend later.
-        # ------------------------------------------------------
 
         self.start_scan_requested.emit(
-            {
-                "target": target,
-                "profile": profile,
-            }
+            config
         )
 
-    # ==========================================================
+    # ========================================================
     # STOP SCAN
-    # ==========================================================
+    # ========================================================
 
     def stop_scan(self):
-
-        self.scan_running = False
 
         self.start_button.setEnabled(
             True
         )
 
-        self.stop_button.setEnabled(
-            False
+        self.progress_bar.setValue(
+            0
         )
 
-        self.status_label.setText(
-            "● SCAN STOPPED"
+        self.scan_status.setText(
+            "● STOPPED"
         )
 
-        self.status_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_YELLOW};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
+        self.set_status_style(
+            COLOR_RED,
+            "#2A1111",
+            "#6B1B1B"
         )
 
         self.stop_scan_requested.emit()
 
-    # ==========================================================
-    # UPDATE SCAN PROGRESS
-    # ==========================================================
+    # ========================================================
+    # HOST SELECTION
+    # ========================================================
 
-    def update_progress(
-        self,
-        value
-    ):
+    def on_host_selected(self):
 
-        value = max(
-            0,
-            min(
-                100,
-                int(value)
+        row = self.host_table.currentRow()
+
+        if row < 0:
+            return
+
+        keys = [
+            "ip",
+            "mac",
+            "hostname",
+            "vendor",
+            "status",
+            "latency",
+            "open_ports",
+            "risk",
+        ]
+
+        host = {}
+
+        for column, key in enumerate(keys):
+
+            item = self.host_table.item(
+                row,
+                column
             )
+
+            host[key] = (
+                item.text()
+                if item
+                else ""
+            )
+
+        self.host_selected.emit(
+            host
         )
 
-        self.scan_progress.setValue(
-            value
+    # ========================================================
+    # VULNERABILITY SELECTION
+    # ========================================================
+
+    def on_vulnerability_selected(self):
+
+        row = self.vulnerability_table.currentRow()
+
+        if row < 0:
+            return
+
+        keys = [
+            "severity",
+            "host",
+            "port",
+            "service",
+            "finding",
+            "evidence",
+            "score",
+            "status",
+        ]
+
+        vulnerability = {}
+
+        for column, key in enumerate(keys):
+
+            item = self.vulnerability_table.item(
+                row,
+                column
+            )
+
+            vulnerability[key] = (
+                item.text()
+                if item
+                else ""
+            )
+
+        self.vulnerability_selected.emit(
+            vulnerability
         )
 
-    # ==========================================================
-    # SCAN FINISHED
-    # ==========================================================
-
-    def scan_finished(self):
-
-        self.scan_running = False
-
-        self.start_button.setEnabled(
-            True
-        )
-
-        self.stop_button.setEnabled(
-            False
-        )
-
-        self.scan_progress.setValue(
-            100
-        )
-
-        self.status_label.setText(
-            "● SCAN COMPLETE"
-        )
-
-        self.status_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_GREEN};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-    # ==========================================================
-    # LOAD HOSTS
-    # ==========================================================
+    # ========================================================
+    # SET HOSTS
+    # ========================================================
 
     def set_hosts(
         self,
         hosts
     ):
 
-        self.all_hosts = list(
-            hosts
-        )
+        self.hosts = hosts or []
 
         self.host_table.setRowCount(
             0
         )
 
-        for row, host in enumerate(
-            self.all_hosts
-        ):
+        for host in self.hosts:
+
+            row = self.host_table.rowCount()
 
             self.host_table.insertRow(
                 row
             )
 
             values = [
-                host.get(
-                    "ip",
-                    "-"
-                ),
-                host.get(
-                    "hostname",
-                    "-"
-                ),
-                host.get(
-                    "mac",
-                    "-"
-                ),
-                host.get(
-                    "vendor",
-                    "-"
-                ),
-                host.get(
-                    "status",
-                    "UNKNOWN"
-                ),
-                host.get(
-                    "latency",
-                    "-"
-                ),
+                host.get("ip", ""),
+                host.get("mac", ""),
+                host.get("hostname", ""),
+                host.get("vendor", ""),
+                host.get("status", ""),
+                host.get("latency", ""),
+                host.get("open_ports", ""),
+                host.get("risk", ""),
             ]
 
-            for column, value in enumerate(
-                values
-            ):
+            for column, value in enumerate(values):
 
                 item = QTableWidgetItem(
                     str(value)
@@ -2329,64 +2926,45 @@ a real scanner run.
                 )
 
         self.host_count_label.setText(
-            f"Hosts: {len(self.all_hosts)}"
+            f"Hosts: {len(self.hosts)}"
         )
 
-        self.device_metric.value_label.setText(
-            str(len(self.all_hosts))
-        )
+        self.update_dashboard_metrics()
 
-    # ==========================================================
-    # LOAD PORTS
-    # ==========================================================
+    # ========================================================
+    # SET PORTS
+    # ========================================================
 
     def set_ports(
         self,
         ports
     ):
 
-        self.all_ports = list(
-            ports
-        )
+        self.ports = ports or []
 
         self.port_table.setRowCount(
             0
         )
 
-        for row, port_data in enumerate(
-            self.all_ports
-        ):
+        for port in self.ports:
+
+            row = self.port_table.rowCount()
 
             self.port_table.insertRow(
                 row
             )
 
             values = [
-                port_data.get(
-                    "host",
-                    "-"
-                ),
-                port_data.get(
-                    "port",
-                    "-"
-                ),
-                port_data.get(
-                    "service",
-                    "-"
-                ),
-                port_data.get(
-                    "version",
-                    "-"
-                ),
-                port_data.get(
-                    "risk",
-                    "LOW"
-                ),
+                port.get("host", ""),
+                port.get("port", ""),
+                port.get("protocol", ""),
+                port.get("service", ""),
+                port.get("state", ""),
+                port.get("risk", ""),
+                port.get("banner", ""),
             ]
 
-            for column, value in enumerate(
-                values
-            ):
+            for column, value in enumerate(values):
 
                 item = QTableWidgetItem(
                     str(value)
@@ -2396,55 +2974,82 @@ a real scanner run.
                     Qt.AlignCenter
                 )
 
-                if column == 4:
-
-                    risk = str(
-                        value
-                    ).upper()
-
-                    if risk == "HIGH":
-
-                        item.setForeground(
-                            Qt.GlobalColor.red
-                        )
-
-                    elif risk == "MEDIUM":
-
-                        item.setForeground(
-                            Qt.GlobalColor.yellow
-                        )
-
-                    else:
-
-                        item.setForeground(
-                            Qt.GlobalColor.green
-                        )
-
                 self.port_table.setItem(
                     row,
                     column,
                     item
                 )
 
-        self.port_count_label.setText(
-            f"Open Ports: {len(self.all_ports)}"
+        self.open_ports_label.setText(
+            f"Open Ports: {len(self.ports)}"
         )
 
-        self.open_port_metric.value_label.setText(
-            str(len(self.all_ports))
+        self.update_dashboard_metrics()
+
+    # ========================================================
+    # SET SERVICES
+    # ========================================================
+
+    def set_services(
+        self,
+        services
+    ):
+
+        self.services = services or []
+
+        self.service_table.setRowCount(
+            0
         )
 
-    # ==========================================================
-    # LOAD VULNERABILITIES
-    # ==========================================================
+        for service in self.services:
+
+            row = self.service_table.rowCount()
+
+            self.service_table.insertRow(
+                row
+            )
+
+            values = [
+                service.get("host", ""),
+                service.get("port", ""),
+                service.get("protocol", ""),
+                service.get("service", ""),
+                service.get("version", ""),
+                service.get("state", ""),
+                service.get("risk", ""),
+            ]
+
+            for column, value in enumerate(values):
+
+                item = QTableWidgetItem(
+                    str(value)
+                )
+
+                item.setTextAlignment(
+                    Qt.AlignCenter
+                )
+
+                self.service_table.setItem(
+                    row,
+                    column,
+                    item
+                )
+
+        self.service_summary.setText(
+            f"Services: {len(self.services)}"
+        )
+
+    # ========================================================
+    # SET VULNERABILITIES
+    # ========================================================
 
     def set_vulnerabilities(
         self,
         vulnerabilities
     ):
 
-        self.all_vulnerabilities = list(
-            vulnerabilities
+        self.vulnerabilities = (
+            vulnerabilities or []
         )
 
         self.vulnerability_table.setRowCount(
@@ -2456,18 +3061,12 @@ a real scanner run.
         medium = 0
         low = 0
 
-        for row, vuln in enumerate(
-            self.all_vulnerabilities
-        ):
-
-            self.vulnerability_table.insertRow(
-                row
-            )
+        for vulnerability in self.vulnerabilities:
 
             severity = str(
-                vuln.get(
+                vulnerability.get(
                     "severity",
-                    "LOW"
+                    ""
                 )
             ).upper()
 
@@ -2480,72 +3079,35 @@ a real scanner run.
             elif severity == "MEDIUM":
                 medium += 1
 
-            else:
+            elif severity == "LOW":
                 low += 1
 
+            row = self.vulnerability_table.rowCount()
+
+            self.vulnerability_table.insertRow(
+                row
+            )
+
             values = [
-                vuln.get(
-                    "host",
-                    "-"
-                ),
-                vuln.get(
-                    "port",
-                    "-"
-                ),
-                vuln.get(
-                    "service",
-                    "-"
-                ),
-                vuln.get(
-                    "finding",
-                    "-"
-                ),
-                severity,
-                vuln.get(
-                    "confidence",
-                    "Medium"
-                ),
+                vulnerability.get("severity", ""),
+                vulnerability.get("host", ""),
+                vulnerability.get("port", ""),
+                vulnerability.get("service", ""),
+                vulnerability.get("finding", ""),
+                vulnerability.get("evidence", ""),
+                vulnerability.get("score", ""),
+                vulnerability.get("status", ""),
             ]
 
-            for column, value in enumerate(
-                values
-            ):
+            for column, value in enumerate(values):
 
                 item = QTableWidgetItem(
                     str(value)
                 )
 
-                if column != 3:
-
-                    item.setTextAlignment(
-                        Qt.AlignCenter
-                    )
-
-                if column == 4:
-
-                    if severity == "CRITICAL":
-
-                        item.setForeground(
-                            Qt.GlobalColor.red
-                        )
-
-                    elif severity == "HIGH":
-
-                        item.setForeground(
-                            Qt.GlobalColor.red
-                        )
-
-                    elif severity == "MEDIUM":
-
-                        item.setForeground(
-                            Qt.GlobalColor.yellow
-                        )
-
-                    else:
-
-                        item.setForeground(
-                            Qt.GlobalColor.green
-                        )
+                item.setTextAlignment(
+                    Qt.AlignCenter
+                )
 
                 self.vulnerability_table.setItem(
                     row,
@@ -2553,269 +3115,467 @@ a real scanner run.
                     item
                 )
 
-        # ------------------------------------------------------
-        # Update counters
-        # ------------------------------------------------------
-
-        self.critical_count.setText(
-            f"CRITICAL {critical}"
+        self.critical_count.value_label.setText(
+            str(critical)
         )
 
-        self.high_count.setText(
-            f"HIGH {high}"
+        self.high_count.value_label.setText(
+            str(high)
         )
 
-        self.medium_count.setText(
-            f"MEDIUM {medium}"
-        )
-
-        self.low_count.setText(
-            f"LOW {low}"
-        )
-
-        self.finding_count_label.setText(
-            f"Findings: {len(self.all_vulnerabilities)}"
-        )
-
-        self.finding_count_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {COLOR_SECONDARY};
-                font-size: 11px;
-                padding-left: 14px;
-            }}
-            """
-        )
-
-        # ------------------------------------------------------
-        # Dashboard metrics
-        # ------------------------------------------------------
-
-        self.high_metric.value_label.setText(
-            str(
-                critical + high
-            )
-        )
-
-        self.medium_metric.value_label.setText(
+        self.medium_count.value_label.setText(
             str(medium)
         )
 
-        # ------------------------------------------------------
-        # Risk calculation
-        # ------------------------------------------------------
-
-        self.calculate_risk_score(
-            critical,
-            high,
-            medium,
-            low
+        self.low_count.value_label.setText(
+            str(low)
         )
 
-    # ==========================================================
-    # RISK SCORE
-    # ==========================================================
+        self.findings_label.setText(
+            f"Findings: {len(self.vulnerabilities)}"
+        )
 
-    def calculate_risk_score(
+        self.update_dashboard_metrics()
+
+    # ========================================================
+    # SET THREAT INTELLIGENCE
+    # ========================================================
+
+    def set_threat_intelligence(
         self,
-        critical,
-        high,
-        medium,
-        low
+        indicators
     ):
 
-        penalty = (
-            critical * 30
-            + high * 15
-            + medium * 7
-            + low * 2
+        self.threat_intelligence = (
+            indicators or []
         )
 
-        score = max(
-            0,
-            100 - penalty
+        self.threat_table.setRowCount(
+            0
         )
 
-        self.score_metric.value_label.setText(
-            str(score)
+        safe = 0
+        suspicious = 0
+        malicious = 0
+        unknown = 0
+
+        for indicator in self.threat_intelligence:
+
+            reputation = str(
+                indicator.get(
+                    "reputation",
+                    "UNKNOWN"
+                )
+            )
+
+            reputation_upper = reputation.upper()
+
+            if reputation_upper == "SAFE":
+                safe += 1
+
+            elif reputation_upper == "SUSPICIOUS":
+                suspicious += 1
+
+            elif reputation_upper == "MALICIOUS":
+                malicious += 1
+
+            else:
+                unknown += 1
+
+            row = self.threat_table.rowCount()
+
+            self.threat_table.insertRow(
+                row
+            )
+
+            values = [
+                indicator.get("indicator", ""),
+                indicator.get("type", ""),
+                indicator.get("country", ""),
+                indicator.get("reputation", ""),
+                indicator.get("confidence", ""),
+                indicator.get("source", ""),
+                indicator.get("first_seen", ""),
+                indicator.get("status", ""),
+            ]
+
+            for column, value in enumerate(values):
+
+                item = QTableWidgetItem(
+                    str(value)
+                )
+
+                item.setTextAlignment(
+                    Qt.AlignCenter
+                )
+
+                self.threat_table.setItem(
+                    row,
+                    column,
+                    item
+                )
+
+        self.safe_indicator.value_label.setText(
+            str(safe)
         )
 
-        self.large_score.setText(
-            f"{score} / 100"
+        self.suspicious_indicator.value_label.setText(
+            str(suspicious)
         )
 
-        # ------------------------------------------------------
-        # Risk classification
-        # ------------------------------------------------------
+        self.malicious_indicator.value_label.setText(
+            str(malicious)
+        )
 
-        if score < 20:
+        self.unknown_indicator.value_label.setText(
+            str(unknown)
+        )
 
-            risk = "CRITICAL"
-            color = COLOR_RED
+        self.threat_summary.setText(
+            f"Indicators: {len(self.threat_intelligence)}"
+        )
 
-        elif score < 40:
+    # ========================================================
+    # UPDATE METRICS
+    # ========================================================
 
-            risk = "HIGH"
-            color = COLOR_RED
+    def update_dashboard_metrics(self):
 
-        elif score < 60:
+        self.set_metric_value(
+            self.metric_devices,
+            len(self.hosts)
+        )
 
-            risk = "MEDIUM"
-            color = COLOR_YELLOW
+        self.set_metric_value(
+            self.metric_ports,
+            len(self.ports)
+        )
 
-        elif score < 80:
+        high = 0
+        medium = 0
 
-            risk = "LOW"
-            color = COLOR_GREEN
+        for vulnerability in self.vulnerabilities:
 
-        else:
+            severity = str(
+                vulnerability.get(
+                    "severity",
+                    ""
+                )
+            ).upper()
 
-            risk = "SAFE"
-            color = COLOR_GREEN
+            if severity in [
+                "CRITICAL",
+                "HIGH",
+            ]:
+                high += 1
+
+            elif severity == "MEDIUM":
+                medium += 1
+
+        self.set_metric_value(
+            self.metric_high,
+            high
+        )
+
+        self.set_metric_value(
+            self.metric_medium,
+            medium
+        )
+
+        score = self.calculate_risk_score()
+
+        self.set_metric_value(
+            self.metric_score,
+            score
+        )
 
         self.risk_label.setText(
-            f"Risk: {risk}"
+            f"Risk: {self.get_risk_level(score)}"
         )
 
-        self.risk_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {color};
-                font-size: 11px;
-                font-weight: 700;
-                padding-left: 14px;
-            }}
-            """
-        )
+    # ========================================================
+    # METRIC VALUE
+    # ========================================================
 
-        self.large_score.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {color};
-                font-size: 26px;
-                font-weight: 700;
-            }}
-            """
-        )
+    def set_metric_value(
+        self,
+        frame,
+        value
+    ):
 
-        self.large_score_status.setText(
-            f" {risk}"
-        )
-
-        self.large_score_status.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {color};
-                font-size: 12px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-        self.score_metric.value_label.setStyleSheet(
-            f"""
-            QLabel {{
-                color: {color};
-                font-size: 22px;
-                font-weight: 700;
-            }}
-            """
-        )
-
-    # ==========================================================
-    # HOST SELECTION
-    # ==========================================================
-
-    def on_host_selected(self):
-
-        selected = (
-            self.host_table.selectedItems()
-        )
-
-        if not selected:
-
-            return
-
-        row = selected[0].row()
-
-        if row < len(
-            self.all_hosts
+        if hasattr(
+            frame,
+            "value_label"
         ):
-
-            self.host_selected.emit(
-                self.all_hosts[row]
+            frame.value_label.setText(
+                str(value)
             )
 
-    # ==========================================================
-    # VULNERABILITY SELECTION
-    # ==========================================================
+    # ========================================================
+    # RISK SCORE
+    # ========================================================
 
-    def on_vulnerability_selected(self):
+    def calculate_risk_score(self):
 
-        selected = (
-            self.vulnerability_table.selectedItems()
+        score = 100
+
+        for vulnerability in self.vulnerabilities:
+
+            severity = str(
+                vulnerability.get(
+                    "severity",
+                    ""
+                )
+            ).upper()
+
+            if severity == "CRITICAL":
+                score -= 25
+
+            elif severity == "HIGH":
+                score -= 15
+
+            elif severity == "MEDIUM":
+                score -= 8
+
+            elif severity == "LOW":
+                score -= 3
+
+        return max(
+            0,
+            min(
+                100,
+                score
+            )
         )
 
-        if not selected:
+    # ========================================================
+    # RISK LEVEL
+    # ========================================================
 
-            return
+    def get_risk_level(
+        self,
+        score
+    ):
 
-        row = selected[0].row()
+        if score >= 80:
+            return "LOW"
 
-        if row < len(
-            self.all_vulnerabilities
-        ):
+        if score >= 60:
+            return "MEDIUM"
 
-            self.vulnerability_selected.emit(
-                self.all_vulnerabilities[row]
-            )
+        if score >= 40:
+            return "HIGH"
 
-    # ==========================================================
-    # LOAD DEMO DATA
-    # ==========================================================
+        return "CRITICAL"
+
+    # ========================================================
+    # DEMO DATA
+    # ========================================================
 
     def load_demo_data(self):
 
-        # ------------------------------------------------------
-        # Hosts
-        # ------------------------------------------------------
+        # ----------------------------------------------------
+        # HOSTS
+        # ----------------------------------------------------
 
         hosts = [
-
             {
                 "ip": "192.168.1.1",
-                "hostname": "router",
                 "mac": "AA:BB:CC:11:22:33",
+                "hostname": "router.local",
                 "vendor": "TP-Link",
                 "status": "ONLINE",
-                "latency": "1.8 ms",
+                "latency": "2 ms",
+                "open_ports": "4",
+                "risk": "LOW",
             },
-
-            {
-                "ip": "192.168.1.10",
-                "hostname": "desktop",
-                "mac": "AA:BB:CC:22:33:44",
-                "vendor": "Dell",
-                "status": "ONLINE",
-                "latency": "2.4 ms",
-            },
-
             {
                 "ip": "192.168.1.12",
-                "hostname": "laptop",
-                "mac": "AA:BB:CC:33:44:55",
-                "vendor": "Lenovo",
+                "mac": "AA:BB:CC:44:55:66",
+                "hostname": "server.local",
+                "vendor": "Dell",
                 "status": "ONLINE",
-                "latency": "2.1 ms",
+                "latency": "5 ms",
+                "open_ports": "6",
+                "risk": "MEDIUM",
             },
-
             {
                 "ip": "192.168.1.20",
-                "hostname": "printer",
-                "mac": "AA:BB:CC:44:55:66",
-                "vendor": "HP",
+                "mac": "AA:BB:CC:77:88:99",
+                "hostname": "windows-pc",
+                "vendor": "Microsoft",
                 "status": "ONLINE",
-                "latency": "5.2 ms",
+                "latency": "8 ms",
+                "open_ports": "3",
+                "risk": "LOW",
+            },
+        ]
+
+        # ----------------------------------------------------
+        # PORTS
+        # ----------------------------------------------------
+
+        ports = [
+            {
+                "host": "192.168.1.1",
+                "port": "80",
+                "protocol": "TCP",
+                "service": "HTTP",
+                "state": "OPEN",
+                "risk": "LOW",
+                "banner": "HTTP Server",
+            },
+            {
+                "host": "192.168.1.1",
+                "port": "443",
+                "protocol": "TCP",
+                "service": "HTTPS",
+                "state": "OPEN",
+                "risk": "LOW",
+                "banner": "HTTPS Server",
+            },
+            {
+                "host": "192.168.1.12",
+                "port": "22",
+                "protocol": "TCP",
+                "service": "SSH",
+                "state": "OPEN",
+                "risk": "LOW",
+                "banner": "OpenSSH",
+            },
+            {
+                "host": "192.168.1.12",
+                "port": "445",
+                "protocol": "TCP",
+                "service": "SMB",
+                "state": "OPEN",
+                "risk": "HIGH",
+                "banner": "Microsoft SMB",
+            },
+            {
+                "host": "192.168.1.20",
+                "port": "3389",
+                "protocol": "TCP",
+                "service": "RDP",
+                "state": "OPEN",
+                "risk": "MEDIUM",
+                "banner": "Microsoft RDP",
+            },
+        ]
+
+        # ----------------------------------------------------
+        # SERVICES
+        # ----------------------------------------------------
+
+        services = [
+            {
+                "host": "192.168.1.1",
+                "port": "80",
+                "protocol": "TCP",
+                "service": "HTTP",
+                "version": "nginx",
+                "state": "OPEN",
+                "risk": "LOW",
+            },
+            {
+                "host": "192.168.1.1",
+                "port": "443",
+                "protocol": "TCP",
+                "service": "HTTPS",
+                "version": "nginx",
+                "state": "OPEN",
+                "risk": "LOW",
+            },
+            {
+                "host": "192.168.1.12",
+                "port": "22",
+                "protocol": "TCP",
+                "service": "SSH",
+                "version": "OpenSSH",
+                "state": "OPEN",
+                "risk": "LOW",
+            },
+            {
+                "host": "192.168.1.12",
+                "port": "445",
+                "protocol": "TCP",
+                "service": "SMB",
+                "version": "Microsoft SMB",
+                "state": "OPEN",
+                "risk": "HIGH",
+            },
+            {
+                "host": "192.168.1.20",
+                "port": "3389",
+                "protocol": "TCP",
+                "service": "RDP",
+                "version": "Microsoft RDP",
+                "state": "OPEN",
+                "risk": "MEDIUM",
+            },
+        ]
+
+        # ----------------------------------------------------
+        # VULNERABILITIES
+        # ----------------------------------------------------
+
+        vulnerabilities = [
+            {
+                "severity": "HIGH",
+                "host": "192.168.1.12",
+                "port": "445",
+                "service": "SMB",
+                "finding": "SMB service exposed",
+                "evidence": "TCP/445 reachable on LAN",
+                "score": "8.2",
+                "status": "OPEN",
+            },
+            {
+                "severity": "MEDIUM",
+                "host": "192.168.1.20",
+                "port": "3389",
+                "service": "RDP",
+                "finding": "RDP exposed",
+                "evidence": "Remote Desktop detected",
+                "score": "6.5",
+                "status": "REVIEW",
+            },
+            {
+                "severity": "LOW",
+                "host": "192.168.1.1",
+                "port": "80",
+                "service": "HTTP",
+                "finding": "Unencrypted HTTP service",
+                "evidence": "TCP/80 detected",
+                "score": "3.1",
+                "status": "INFO",
+            },
+        ]
+
+        # ----------------------------------------------------
+        # THREAT INTELLIGENCE
+        # ----------------------------------------------------
+
+        threats = [
+            {
+                "indicator": "192.168.1.12",
+                "type": "IP",
+                "country": "LOCAL",
+                "reputation": "UNKNOWN",
+                "confidence": "N/A",
+                "source": "Local Analysis",
+                "first_seen": "Current",
+                "status": "REVIEW",
+            },
+            {
+                "indicator": "example.local",
+                "type": "DOMAIN",
+                "country": "LOCAL",
+                "reputation": "SAFE",
+                "confidence": "LOW",
+                "source": "Local Analysis",
+                "first_seen": "Current",
+                "status": "CLEAR",
             },
         ]
 
@@ -2823,180 +3583,109 @@ a real scanner run.
             hosts
         )
 
-        # ------------------------------------------------------
-        # Ports
-        # ------------------------------------------------------
-
-        ports = [
-
-            {
-                "host": "192.168.1.1",
-                "port": 80,
-                "service": "HTTP",
-                "version": "Unknown",
-                "risk": "LOW",
-            },
-
-            {
-                "host": "192.168.1.1",
-                "port": 443,
-                "service": "HTTPS",
-                "version": "Unknown",
-                "risk": "LOW",
-            },
-
-            {
-                "host": "192.168.1.12",
-                "port": 445,
-                "service": "SMB",
-                "version": "Microsoft",
-                "risk": "HIGH",
-            },
-
-            {
-                "host": "192.168.1.12",
-                "port": 3389,
-                "service": "RDP",
-                "version": "Microsoft",
-                "risk": "HIGH",
-            },
-
-            {
-                "host": "192.168.1.20",
-                "port": 80,
-                "service": "HTTP",
-                "version": "Printer Web",
-                "risk": "MEDIUM",
-            },
-        ]
-
         self.set_ports(
             ports
         )
 
-        # ------------------------------------------------------
-        # Vulnerabilities
-        # ------------------------------------------------------
-
-        vulnerabilities = [
-
-            {
-                "host": "192.168.1.12",
-                "port": 445,
-                "service": "SMB",
-                "finding": (
-                    "SMB service is exposed on the network"
-                ),
-                "severity": "HIGH",
-                "confidence": "Medium",
-            },
-
-            {
-                "host": "192.168.1.12",
-                "port": 3389,
-                "service": "RDP",
-                "finding": (
-                    "Remote Desktop service is exposed"
-                ),
-                "severity": "HIGH",
-                "confidence": "Medium",
-            },
-
-            {
-                "host": "192.168.1.20",
-                "port": 80,
-                "service": "HTTP",
-                "finding": (
-                    "Web management interface is using HTTP"
-                ),
-                "severity": "MEDIUM",
-                "confidence": "High",
-            },
-
-            {
-                "host": "192.168.1.20",
-                "port": 21,
-                "service": "FTP",
-                "finding": (
-                    "Insecure FTP service detected"
-                ),
-                "severity": "MEDIUM",
-                "confidence": "High",
-            },
-        ]
+        self.set_services(
+            services
+        )
 
         self.set_vulnerabilities(
             vulnerabilities
         )
 
-        # ------------------------------------------------------
+        self.set_threat_intelligence(
+            threats
+        )
+
+        # ----------------------------------------------------
+        # Dashboard findings
+        # ----------------------------------------------------
+
+        self.dashboard_findings.setRowCount(
+            0
+        )
+
+        for finding in vulnerabilities:
+
+            row = self.dashboard_findings.rowCount()
+
+            self.dashboard_findings.insertRow(
+                row
+            )
+
+            values = [
+                finding["severity"],
+                finding["host"],
+                finding["finding"],
+                finding["status"],
+            ]
+
+            for column, value in enumerate(values):
+
+                item = QTableWidgetItem(
+                    value
+                )
+
+                item.setTextAlignment(
+                    Qt.AlignCenter
+                )
+
+                self.dashboard_findings.setItem(
+                    row,
+                    column,
+                    item
+                )
+
+        # ----------------------------------------------------
         # Summary
-        # ------------------------------------------------------
+        # ----------------------------------------------------
 
-        self.summary_label.setText(
-            "4 potential security findings detected. "
-            "Two high-risk exposed services require attention. "
-            "Findings are assessment indicators and require "
-            "service/version verification before treating them "
-            "as confirmed vulnerabilities."
+        score = self.calculate_risk_score()
+
+        self.summary_text.setPlainText(
+            "NETWORK SECURITY SCAN\n"
+            "=====================\n\n"
+            "Target: 192.168.1.0/24\n"
+            "Profile: Quick Discovery\n\n"
+            f"Hosts discovered : {len(hosts)}\n"
+            f"Open ports       : {len(ports)}\n"
+            f"Services         : {len(services)}\n"
+            f"Findings         : {len(vulnerabilities)}\n"
+            f"Security score   : {score}/100\n"
+            f"Risk level       : {self.get_risk_level(score)}\n\n"
+            "This screen currently uses demonstration data.\n"
+            "Real network scanning will be connected through "
+            "the backend scanner services."
         )
 
-        # ------------------------------------------------------
+        # ----------------------------------------------------
         # Report
-        # ------------------------------------------------------
+        # ----------------------------------------------------
 
-        self.update_report()
-
-    # ==========================================================
-    # UPDATE REPORT
-    # ==========================================================
-
-    def update_report(self):
-
-        score = (
-            self.score_metric.value_label.text()
+        self.report_text.setPlainText(
+            "NETWORK DEFENSE MONITOR\n"
+            "=======================\n\n"
+            "SECURITY ASSESSMENT REPORT\n\n"
+            "Target Network : 192.168.1.0/24\n"
+            "Scan Profile   : Quick Discovery\n\n"
+            "DISCOVERY\n"
+            "---------\n"
+            f"Hosts discovered : {len(hosts)}\n"
+            f"Open ports       : {len(ports)}\n"
+            f"Services         : {len(services)}\n\n"
+            "SECURITY FINDINGS\n"
+            "-----------------\n"
+            f"Critical : 0\n"
+            f"High     : 1\n"
+            f"Medium   : 1\n"
+            f"Low      : 1\n\n"
+            f"Security Score : {score}/100\n"
+            f"Risk Level     : {self.get_risk_level(score)}\n\n"
+            "IMPORTANT\n"
+            "---------\n"
+            "Findings shown in this UI are demonstration data.\n"
+            "A finding does not automatically prove compromise "
+            "or malicious activity."
         )
-
-        self.report_text.setText(
-            f"""
-NDM SECURITY ASSESSMENT
-
-Target Network:
-{self.network_input.text()}
-
-Hosts Discovered:
-{len(self.all_hosts)}
-
-Open Ports:
-{len(self.all_ports)}
-
-Security Findings:
-{len(self.all_vulnerabilities)}
-
-Critical:
-{self.critical_count.text().split()[-1]}
-
-High:
-{self.high_count.text().split()[-1]}
-
-Medium:
-{self.medium_count.text().split()[-1]}
-
-Low:
-{self.low_count.text().split()[-1]}
-
-Security Score:
-{score} / 100
-
-Risk:
-{self.risk_label.text().replace("Risk: ", "")}
-
-Status:
-Assessment ready.
-            """
-        )
-
-
-# ==============================================================
-# END OF NDM_SCANNER.PY
-# ==============================================================

@@ -236,6 +236,91 @@ class DashboardPage(QWidget):
             "dashboardPage"
         )
 
+        # Dashboard-local theme: keeps this page dark even when the
+        # application-wide stylesheet does not reach its child widgets.
+        self.setStyleSheet("""
+            QWidget#dashboardPage {
+                background-color: #0B1120;
+                color: #E5E7EB;
+                font-family: "Segoe UI";
+                font-size: 10px;
+            }
+            QFrame[panel="true"], QFrame[metricCard="true"] {
+                background-color: #111827;
+                border: 1px solid #1F2937;
+                border-radius: 7px;
+            }
+            QLabel[heading="true"] {
+                color: #60A5FA;
+                font-weight: 700;
+            }
+            QLabel[secondary="true"], QLabel[cardTitle="true"] {
+                color: #94A3B8;
+            }
+            QPushButton {
+                background-color: #172033;
+                color: #E5E7EB;
+                border: 1px solid #334155;
+                border-radius: 5px;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                background-color: #24334B;
+                border-color: #3B82F6;
+            }
+            QPushButton[success="true"] {
+                background-color: #14532D;
+                color: #DCFCE7;
+                border: 1px solid #22C55E;
+                font-weight: 600;
+            }
+            QPushButton[danger="true"] {
+                background-color: #3A1720;
+                color: #FCA5A5;
+                border: 1px solid #DC2626;
+                font-weight: 600;
+            }
+            QPushButton[secondary="true"] {
+                background-color: #172033;
+                color: #BFDBFE;
+                border: 1px solid #334155;
+            }
+            QTableWidget {
+                background-color: #0F172A;
+                alternate-background-color: #111827;
+                color: #E5E7EB;
+                gridline-color: #263449;
+                border: 1px solid #263449;
+                selection-background-color: #1D4ED8;
+                selection-color: #FFFFFF;
+                outline: 0;
+            }
+            QTableWidget::item {
+                padding: 4px;
+                border-bottom: 1px solid #1F2937;
+            }
+            QHeaderView::section {
+                background-color: #172033;
+                color: #93C5FD;
+                border: 1px solid #263449;
+                padding: 7px 5px;
+                font-weight: 700;
+                font-size: 9px;
+            }
+            QScrollBar:vertical, QScrollBar:horizontal {
+                background-color: #0B1120;
+                border: none;
+                width: 10px;
+                height: 10px;
+            }
+            QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+                background-color: #334155;
+                border-radius: 4px;
+                min-height: 20px;
+                min-width: 20px;
+            }
+        """)
+
         # Build Dashboard UI.
         self.setup_ui()
 
@@ -1154,6 +1239,13 @@ class DashboardPage(QWidget):
         self.packet_table.setAlternatingRowColors(
             True
         )
+        self.packet_table.setWordWrap(False)
+        self.packet_table.setHorizontalScrollMode(
+            QAbstractItemView.ScrollPerPixel
+        )
+        self.packet_table.setVerticalScrollMode(
+            QAbstractItemView.ScrollPerPixel
+        )
 
         # ======================================================
         # TEMPORARY PACKET DATA
@@ -1322,26 +1414,8 @@ class DashboardPage(QWidget):
                     str(value)
                 )
 
-                # ------------------------------------------------
-                # CENTER SELECTED COLUMNS
-                # ------------------------------------------------
-
-                if column_index in (
-
-                    0,   # Packet ID
-                    1,   # Timestamp
-                    2,   # Protocol
-                    3,   # Direction
-                    5,   # Source Port
-                    7,   # Destination Port
-                    8,   # Length
-                    9,   # Country
-
-                ):
-
-                    item.setTextAlignment(
-                        Qt.AlignCenter
-                    )
+                # Center-align packet values for a consistent table.
+                item.setTextAlignment(Qt.AlignCenter)
 
                 self.packet_table.setItem(
                     row_index,
