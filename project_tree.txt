@@ -1,0 +1,95 @@
+Folder PATH listing
+Volume serial number is 203B-455F
+C:.
+|   main.py
+|   project_tree.txt
+|   tatus
+|   
++---1frontend
+|   |   1dashboard.py
+|   |   1overview.py
+|   |   2overview.py
+|   |   dashboard.py
+|   |   inspection.py
+|   |   main_window.py
+|   |   ndm_scanner.py
+|   |   Network_Traffic_Analyzer_UI_Fixed.zip
+|   |   overview.py
+|   |   README_UI_FIX.txt
+|   |   speed_test.py
+|   |   __init__.py
+|   |   
+|   +---styles
+|   |       theme.qss
+|   |       __init__.py
+|   |       
+|   +---widgets
+|   |       __init__.py
+|   |       
+|   \---__pycache__
+|           dashboard.cpython-314.pyc
+|           inspection.cpython-314.pyc
+|           main_window.cpython-314.pyc
+|           ndm_scanner.cpython-314.pyc
+|           overview.cpython-314.pyc
+|           speed_test.cpython-314.pyc
+|           __init__.cpython-314.pyc
+|           
++---assets
+|   \---icons
++---backend
+|   |   __init__.py
+|   |   
+|   +---capture
+|   |       __init__.py
+|   |       
+|   +---network
+|   |       __init__.py
+|   |       
+|   +---process
+|   |       __init__.py
+|   |       
+|   \---services
+|           __init__.py
+|           
++---frontend
+|   |   1ndm_scanner.py
+|   |   1speed_test.py
+|   |   2speed_test.py
+|   |   dashboard.py
+|   |   inspection.py
+|   |   main_window.py
+|   |   ndm_scanner.py
+|   |   overview.py
+|   |   speed_test.py
+|   |   
+|   +---styles
+|   |       theme.qss
+|   |       __init__.py
+|   |       
+|   +---widgets
+|   |       __init__.py
+|   |       
+|   \---__pycache__
+|           dashboard.cpython-314.pyc
+|           inspection.cpython-314.pyc
+|           main_window.cpython-314.pyc
+|           ndm_scanner.cpython-314.pyc
+|           overview.cpython-314.pyc
+|           speed_test.cpython-314.pyc
+|           __init__.cpython-314.pyc
+|           
++---gui
+|   |   app_state.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           app_state.cpython-314.pyc
+|           __init__.cpython-314.pyc
+|           
++---models
+|       __init__.py
+|       
+\---utils
+        __init__.py
+        

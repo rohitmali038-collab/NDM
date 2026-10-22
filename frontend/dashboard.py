@@ -19,8 +19,24 @@
 #
 # ==============================================================
 
+from backend.network.adapter_info import get_network_adapters
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
+from PySide6.QtGui import QColor
+from datetime import datetime
+import socket
+import uuid
+import time
 
-from PySide6.QtCore import Qt
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
+    from scapy.all import sniff, IP, IPv6, TCP, UDP, ICMP, ARP
+except ImportError:
+    sniff = IP = IPv6 = TCP = UDP = ICMP = ARP = None
+
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -115,7 +131,7 @@ RESCAN_BUTTON_WIDTH = 145
 
 # Wi-Fi / Selected Adapter panel height.
 # Current: 68 px
-ADAPTER_PANEL_HEIGHT = 68
+ADAPTER_PANEL_HEIGHT = 88
 
 
 # --------------------------------------------------------------
@@ -225,6 +241,101 @@ COLOR_TEXT_MUTED = "#64748B"
 # ==============================================================
 
 
+class PacketCaptureWorker(QThread):
+    packets_received = Signal(list)
+    capture_error = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        self._stop_requested = False
+        self._packet_batch = []
+        self._last_batch_emit = time.monotonic()
+        try:
+            self._local_addresses = {
+                address.address.split("%", 1)[0]
+                for address_list in psutil.net_if_addrs().values()
+                for address in address_list
+                if address.family in (socket.AF_INET, socket.AF_INET6)
+            } if psutil else set()
+        except Exception:
+            self._local_addresses = set()
+
+    def stop(self):
+        self._stop_requested = True
+
+    def run(self):
+        if sniff is None:
+            self.capture_error.emit("Scapy is not installed. Install it with: python -m pip install scapy")
+            return
+        try:
+            # Windows packet capture generally requires Npcap and elevated permissions.
+            sniff(prn=self._handle_packet, store=False, stop_filter=lambda _pkt: self._stop_requested)
+        except Exception as exc:
+            self.capture_error.emit(str(exc))
+        finally:
+            self._emit_packet_batch()
+
+    def _emit_packet_batch(self):
+        if self._packet_batch:
+            batch = self._packet_batch
+            self._packet_batch = []
+            self._last_batch_emit = time.monotonic()
+            self.packets_received.emit(batch)
+
+    def _handle_packet(self, pkt):
+        if self._stop_requested:
+            return
+        try:
+            proto = "OTHER"
+            src_port = dst_port = "-"
+            src = dst = "-"
+            if IP in pkt:
+                src, dst = pkt[IP].src, pkt[IP].dst
+            elif IPv6 in pkt:
+                src, dst = pkt[IPv6].src, pkt[IPv6].dst
+            if TCP in pkt:
+                src_port, dst_port = pkt[TCP].sport, pkt[TCP].dport
+                # Classify well-known application traffic before transport protocol.
+                if src_port == 53 or dst_port == 53:
+                    proto = "DNS"
+                elif src_port == 443 or dst_port == 443:
+                    proto = "TLS"
+                else:
+                    proto = "TCP"
+            elif UDP in pkt:
+                src_port, dst_port = pkt[UDP].sport, pkt[UDP].dport
+                if src_port == 53 or dst_port == 53:
+                    proto = "DNS"
+                else:
+                    proto = "UDP"
+            elif ICMP in pkt:
+                proto = "ICMP"
+            elif ARP in pkt:
+                proto = "ARP"
+                src, dst = pkt[ARP].psrc, pkt[ARP].pdst
+            direction = "OUT" if src in self._local_addresses else ("IN" if dst in self._local_addresses else "TRANSIT")
+            packet = {
+                "packet_id": uuid.uuid4().hex[:8],
+                "time": datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                "protocol": proto,
+                "direction": direction,
+                "source": src,
+                "source_port": src_port,
+                "destination": dst,
+                "destination_port": dst_port,
+                "size": f"{len(pkt)} B",
+                "country": "Unknown",
+                "process": "Unknown",
+            }
+            self._packet_batch.append(packet)
+            # Batch UI updates to avoid a redraw for every captured packet.
+            now = time.monotonic()
+            if len(self._packet_batch) >= 30 or now - self._last_batch_emit >= 0.10:
+                self._emit_packet_batch()
+        except Exception:
+            pass
+
+
 class DashboardPage(QWidget):
 
     def __init__(self):
@@ -235,6 +346,15 @@ class DashboardPage(QWidget):
         self.setObjectName(
             "dashboardPage"
         )
+
+        # Explicitly paint the page background behind layout spacing.
+        # This prevents the parent/stacked-widget white background from
+        # showing through as white separator lines between dashboard panels.
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(palette.ColorRole.Window, QColor("#0B1120"))
+        self.setPalette(palette)
 
         # Dashboard-local theme: keeps this page dark even when the
         # application-wide stylesheet does not reach its child widgets.
@@ -322,7 +442,21 @@ class DashboardPage(QWidget):
         """)
 
         # Build Dashboard UI.
+        self.capture_worker = None
+        self.total_packets = 0
+        self.incoming_packets = 0
+        self.outgoing_packets = 0
+        self.protocol_counts = {"TCP": 0, "UDP": 0, "TLS": 0, "DNS": 0, "ICMP": 0}
+        self._protocol_widgets = {}
+        self._connection_labels = {}
+        self._adapter_labels = {}
         self.setup_ui()
+        self.refresh_adapter_info()
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setInterval(5000)
+        self.refresh_timer.timeout.connect(self.refresh_live_statistics)
+        self.refresh_timer.start()
+        self.refresh_live_statistics()
 
     # ==========================================================
     # MAIN UI
@@ -482,6 +616,8 @@ class DashboardPage(QWidget):
         start_button = QPushButton(
             "▶  Start Capture"
         )
+        self.start_button = start_button
+        start_button.clicked.connect(self.start_capture)
 
         start_button.setProperty(
             "success",
@@ -509,6 +645,9 @@ class DashboardPage(QWidget):
         stop_button = QPushButton(
             "■  Stop Capture"
         )
+        self.stop_button = stop_button
+        stop_button.clicked.connect(self.stop_capture)
+        stop_button.setEnabled(False)
 
         stop_button.setProperty(
             "danger",
@@ -531,6 +670,8 @@ class DashboardPage(QWidget):
         rescan_button = QPushButton(
             "⟳  Rescan Adapters"
         )
+        self.rescan_button = rescan_button
+        rescan_button.clicked.connect(self.rescan_adapters)
 
         rescan_button.setProperty(
             "secondary",
@@ -545,6 +686,13 @@ class DashboardPage(QWidget):
             RESCAN_BUTTON_WIDTH,
             CAPTURE_BUTTON_HEIGHT
         )
+
+        # Live capture indicator: appears beside Rescan only while capturing.
+        self.capture_status_label = QLabel("●  Packet Capturing...")
+        self.capture_status_label.setStyleSheet(
+            "QLabel { color: #00E676; font-weight: 700; padding-left: 8px; }"
+        )
+        self.capture_status_label.hide()
 
         # ======================================================
         # ADD BUTTONS
@@ -561,6 +709,8 @@ class DashboardPage(QWidget):
         layout.addWidget(
             rescan_button
         )
+
+        layout.addWidget(self.capture_status_label)
 
         # ------------------------------------------------------
         # REMAINING SPACE
@@ -658,8 +808,9 @@ class DashboardPage(QWidget):
         )
 
         adapter_name = QLabel(
-            "Wi-Fi"
+            "Detecting adapter..."
         )
+        self._adapter_labels["name"] = adapter_name
 
         adapter_name.setProperty(
             "heading",
@@ -667,8 +818,9 @@ class DashboardPage(QWidget):
         )
 
         adapter_description = QLabel(
-            "Intel(R) Wi-Fi 6 AX201 160MHz"
+            "Reading network interface details"
         )
+        self._adapter_labels["description"] = adapter_description
 
         adapter_description.setProperty(
             "secondary",
@@ -676,8 +828,9 @@ class DashboardPage(QWidget):
         )
 
         adapter_status = QLabel(
-            "●  Connected"
+            "●  Checking status"
         )
+        self._adapter_labels["status"] = adapter_status
 
         adapter_status.setProperty(
             "success",
@@ -729,22 +882,22 @@ class DashboardPage(QWidget):
 
             (
                 "IPv4 Address",
-                "192.168.1.100"
+                "Detecting..."
             ),
 
             (
                 "IPv6 Address",
-                "2405:201:abcd:1234::1"
+                "Detecting..."
             ),
 
             (
                 "MAC Address",
-                "3C-52-82-9A-4F-1D"
+                "Detecting..."
             ),
 
             (
                 "Status",
-                "●  Up"
+                "Checking..."
             ),
         ]
 
@@ -776,6 +929,7 @@ class DashboardPage(QWidget):
             value_label = QLabel(
                 value
             )
+            self._adapter_labels[name] = value_label
 
             if name == "Status":
 
@@ -837,7 +991,7 @@ class DashboardPage(QWidget):
             self.create_metric_card(
                 icon="◉",
                 title="TOTAL PACKETS",
-                value="125,430",
+                value="0",
                 icon_color=COLOR_BLUE
             )
         )
@@ -850,7 +1004,7 @@ class DashboardPage(QWidget):
             self.create_metric_card(
                 icon="↓",
                 title="INCOMING PACKETS",
-                value="72,210",
+                value="0",
                 icon_color=COLOR_GREEN
             )
         )
@@ -863,7 +1017,7 @@ class DashboardPage(QWidget):
             self.create_metric_card(
                 icon="↑",
                 title="OUTGOING PACKETS",
-                value="53,220",
+                value="0",
                 icon_color=COLOR_RED
             )
         )
@@ -1025,6 +1179,7 @@ class DashboardPage(QWidget):
         value_label = QLabel(
             value
         )
+        card.metric_value_label = value_label
 
         value_label.setStyleSheet(
             f"""
@@ -1175,12 +1330,8 @@ class DashboardPage(QWidget):
         )
 
         # ------------------------------------------------------
-        # TEMPORARY ROWS
-        # ------------------------------------------------------
-
-        self.packet_table.setRowCount(
-            10
-        )
+        # Live packet rows are inserted only after capture starts.
+        self.packet_table.setRowCount(0)
 
         # ------------------------------------------------------
         # TABLE HEIGHT
@@ -1248,182 +1399,8 @@ class DashboardPage(QWidget):
         )
 
         # ======================================================
-        # TEMPORARY PACKET DATA
-        # ======================================================
-        #
-        # UI TEST DATA ONLY.
-        #
-        # ======================================================
+        # No fabricated packets: the table stays empty until live capture.
 
-        packets = [
-
-            (
-                "pkt-10183",
-                "14:25:06.800",
-                "DNS",
-                "OUT",
-                "157.240.22.35",
-                "41047",
-                "1.1.1.1",
-                "53",
-                "397 B",
-                "Australia",
-                "System"
-            ),
-
-            (
-                "pkt-10182",
-                "14:25:06.029",
-                "TLS",
-                "OUT",
-                "157.240.22.35",
-                "44674",
-                "10.0.2.10",
-                "443",
-                "462 B",
-                "Private",
-                "chrome.exe"
-            ),
-
-            (
-                "pkt-10181",
-                "14:25:05.256",
-                "SSH",
-                "IN",
-                "10.0.3.51",
-                "3635",
-                "10.0.2.199",
-                "22",
-                "935 B",
-                "Private",
-                "sshd.exe"
-            ),
-
-            (
-                "pkt-10180",
-                "14:25:04.444",
-                "HTTP",
-                "OUT",
-                "10.0.3.50",
-                "43508",
-                "10.0.2.10",
-                "80",
-                "782 B",
-                "Private",
-                "python.exe"
-            ),
-
-            (
-                "pkt-10179",
-                "14:25:03.642",
-                "DNS",
-                "OUT",
-                "203.0.113.88",
-                "17504",
-                "1.1.1.1",
-                "53",
-                "554 B",
-                "Australia",
-                "System"
-            ),
-
-            (
-                "pkt-10178",
-                "14:25:02.781",
-                "TLS",
-                "OUT",
-                "194.26.29.44",
-                "18068",
-                "10.0.2.10",
-                "443",
-                "384 B",
-                "Private",
-                "chrome.exe"
-            ),
-
-            (
-                "pkt-10177",
-                "14:25:02.144",
-                "ICMP",
-                "OUT",
-                "45.142.214.19",
-                "-",
-                "8.8.8.8",
-                "-",
-                "128 B",
-                "United States",
-                "System"
-            ),
-
-            (
-                "pkt-10176",
-                "14:25:01.653",
-                "ARP",
-                "LOCAL",
-                "192.168.1.1",
-                "-",
-                "192.168.1.100",
-                "-",
-                "60 B",
-                "Private",
-                "System"
-            ),
-
-            (
-                "pkt-10175",
-                "14:25:00.981",
-                "HTTP",
-                "OUT",
-                "172.217.12.14",
-                "52314",
-                "10.0.2.10",
-                "80",
-                "420 B",
-                "Private",
-                "chrome.exe"
-            ),
-
-            (
-                "pkt-10174",
-                "14:25:00.452",
-                "DNS",
-                "OUT",
-                "192.168.1.100",
-                "52314",
-                "8.8.8.8",
-                "53",
-                "72 B",
-                "United States",
-                "System"
-            ),
-        ]
-
-        # ======================================================
-        # INSERT DUMMY PACKETS
-        # ======================================================
-
-        for row_index, packet in enumerate(
-            packets
-        ):
-
-            for column_index, value in enumerate(
-                packet
-            ):
-
-                item = QTableWidgetItem(
-                    str(value)
-                )
-
-                # Center-align packet values for a consistent table.
-                item.setTextAlignment(Qt.AlignCenter)
-
-                self.packet_table.setItem(
-                    row_index,
-                    column_index,
-                    item
-                )
-
-        # ======================================================
         # TABLE COLUMN WIDTHS
         # ======================================================
         #
@@ -1528,167 +1505,81 @@ class DashboardPage(QWidget):
     def create_protocol_panel(self):
 
         panel = QFrame()
+        panel.setProperty("panel", True)
+        panel.setFixedHeight(BOTTOM_PANEL_HEIGHT)
 
-        panel.setProperty(
-            "panel",
-            True
-        )
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(2)
 
-        # Current: 120 px.
-        panel.setFixedHeight(
-            BOTTOM_PANEL_HEIGHT
-        )
-
-        layout = QVBoxLayout(
-            panel
-        )
-
-        layout.setContentsMargins(
-            10,
-            6,
-            10,
-            6
-        )
-
-        layout.setSpacing(
-            2
-        )
-
-        title = QLabel(
-            "PROTOCOL STATISTICS"
-        )
-
-        title.setProperty(
-            "heading",
-            True
-        )
-
-        layout.addWidget(
-            title
-        )
-
-        # ------------------------------------------------------
-        # DUMMY DATA
-        # ------------------------------------------------------
+        title = QLabel("PROTOCOL STATISTICS")
+        title.setProperty("heading", True)
+        layout.addWidget(title)
 
         protocols = [
-
-            (
-                "TCP",
-                "52%",
-                COLOR_BLUE,
-                190
-            ),
-
-            (
-                "UDP",
-                "29%",
-                COLOR_GREEN,
-                110
-            ),
-
-            (
-                "TLS",
-                "8%",
-                COLOR_PURPLE,
-                60
-            ),
-
-            (
-                "DNS",
-                "5%",
-                COLOR_YELLOW,
-                40
-            ),
-
-            (
-                "ICMP",
-                "3%",
-                COLOR_RED,
-                25
-            ),
+            ("TCP", COLOR_BLUE),
+            ("UDP", COLOR_GREEN),
+            ("TLS", COLOR_PURPLE),
+            ("DNS", COLOR_YELLOW),
+            ("ICMP", COLOR_RED),
         ]
 
-        for (
-            protocol,
-            percentage,
-            color,
-            bar_width
-        ) in protocols:
-
+        self._protocol_widgets = {}
+        for protocol, color in protocols:
             row = QHBoxLayout()
+            row.setSpacing(6)
 
-            row.setSpacing(
-                6
-            )
-
-            # Protocol name.
-            name = QLabel(
-                protocol
-            )
-
-            name.setMinimumWidth(
-                45
-            )
-
-            # --------------------------------------------------
-            # PROTOCOL BAR
-            # --------------------------------------------------
-            #
-            # Height = 5 px
-            # Width  = bar_width
-            #
-            # --------------------------------------------------
+            name = QLabel(protocol)
+            name.setMinimumWidth(45)
+            # Explicitly set the protocol name color so the global QSS
+            # cannot render labels black on the dark dashboard panel.
+            name.setStyleSheet("QLabel { color: #94A3B8; font-weight: 500; }")
 
             bar = QFrame()
-
-            bar.setFixedSize(
-                bar_width,
-                5
-            )
-
+            bar.setFixedSize(0, 5)
             bar.setStyleSheet(
-                f"""
-                QFrame {{
-                    background-color: {color};
-                    border-radius: 2px;
-                }}
-                """
+                f"QFrame {{ background-color: {color}; border-radius: 2px; }}"
             )
 
-            # Percentage.
-            value = QLabel(
-                percentage
-            )
+            value = QLabel("0%")
+            value.setMinimumWidth(35)
+            value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            value.setProperty("secondary", True)
 
-            value.setProperty(
-                "secondary",
-                True
-            )
-
-            row.addWidget(
-                name
-            )
-
-            row.addWidget(
-                bar
-            )
-
+            row.addWidget(name)
+            row.addWidget(bar)
             row.addStretch()
+            row.addWidget(value)
+            layout.addLayout(row)
 
-            row.addWidget(
-                value
-            )
-
-            layout.addLayout(
-                row
-            )
+            self._protocol_widgets[protocol] = {
+                "bar": bar,
+                "value": value,
+                "color": color,
+            }
 
         return panel
 
-    # ==========================================================
-    # CONNECTION STATISTICS
-    # ==========================================================
+    def update_protocol_statistics(self, protocol):
+        """Compatibility helper for a single captured protocol."""
+        self.update_protocol_statistics_batch([protocol])
+
+    def update_protocol_statistics_batch(self, protocols):
+        """Update protocol counts and redraw bars only once per packet batch."""
+        for protocol in protocols:
+            protocol = str(protocol).upper()
+            if protocol in self.protocol_counts:
+                self.protocol_counts[protocol] += 1
+
+        total = sum(self.protocol_counts.values())
+        if total <= 0:
+            return
+
+        max_bar_width = 180
+        for name, widgets in self._protocol_widgets.items():
+            percentage = (self.protocol_counts.get(name, 0) / total) * 100
+            widgets["bar"].setFixedWidth(max(0, round(max_bar_width * percentage / 100)))
+            widgets["value"].setText(f"{percentage:.0f}%")
 
     def create_connection_panel(self):
 
@@ -1808,8 +1699,9 @@ class DashboardPage(QWidget):
             )
 
             value_label = QLabel(
-                value
+                "0"
             )
+            self._connection_labels[name] = value_label
 
             value_label.setProperty(
                 "heading",
@@ -1845,17 +1737,12 @@ class DashboardPage(QWidget):
         outgoing_packets
     ):
 
-        self.total_packets = (
-            total_packets
-        )
-
-        self.incoming_packets = (
-            incoming_packets
-        )
-
-        self.outgoing_packets = (
-            outgoing_packets
-        )
+        self.total_packets = int(total_packets)
+        self.incoming_packets = int(incoming_packets)
+        self.outgoing_packets = int(outgoing_packets)
+        self.total_packet_card.metric_value_label.setText(f"{self.total_packets:,}")
+        self.incoming_packet_card.metric_value_label.setText(f"{self.incoming_packets:,}")
+        self.outgoing_packet_card.metric_value_label.setText(f"{self.outgoing_packets:,}")
 
     # ==========================================================
     # ADD LIVE PACKET
@@ -1865,107 +1752,50 @@ class DashboardPage(QWidget):
     #
     # ==============================================================
 
-    def add_packet(
-        self,
-        packet
-    ):
+    def add_packet(self, packet):
+        """Add one packet through the same efficient batch path."""
+        self.add_packets([packet])
 
-        # Current number of rows.
-        row = (
-            self.packet_table.rowCount()
-        )
+    def add_packets(self, packets):
+        """Insert a batch of packets with one table refresh/scroll operation."""
+        if not packets:
+            return
 
-        # Add new row.
-        self.packet_table.insertRow(
-            row
-        )
+        table = self.packet_table
+        table.setUpdatesEnabled(False)
+        try:
+            for packet in packets:
+                row = table.rowCount()
+                table.insertRow(row)
+                values = [
+                    packet.get("packet_id", "-"),
+                    packet.get("time", "-"),
+                    packet.get("protocol", "-"),
+                    packet.get("direction", "-"),
+                    packet.get("source", "-"),
+                    packet.get("source_port", "-"),
+                    packet.get("destination", "-"),
+                    packet.get("destination_port", "-"),
+                    packet.get("size", "-"),
+                    packet.get("country", "Unknown"),
+                    packet.get("process", "Unknown"),
+                ]
+                for column, value in enumerate(values):
+                    item = QTableWidgetItem(str(value))
+                    item.setTextAlignment(Qt.AlignCenter)
+                    table.setItem(row, column, item)
 
-        # ------------------------------------------------------
-        # PACKET DATA
-        # ------------------------------------------------------
+            # Keep only the newest 500 rows; remove overflow in one operation.
+            overflow = table.rowCount() - 500
+            if overflow > 0:
+                table.setUpdatesEnabled(True)
+                for _ in range(overflow):
+                    table.removeRow(0)
+                table.setUpdatesEnabled(False)
+        finally:
+            table.setUpdatesEnabled(True)
 
-        values = [
-
-            packet.get(
-                "packet_id",
-                "-"
-            ),
-
-            packet.get(
-                "time",
-                "-"
-            ),
-
-            packet.get(
-                "protocol",
-                "-"
-            ),
-
-            packet.get(
-                "direction",
-                "-"
-            ),
-
-            packet.get(
-                "source",
-                "-"
-            ),
-
-            packet.get(
-                "source_port",
-                "-"
-            ),
-
-            packet.get(
-                "destination",
-                "-"
-            ),
-
-            packet.get(
-                "destination_port",
-                "-"
-            ),
-
-            packet.get(
-                "size",
-                "-"
-            ),
-
-            packet.get(
-                "country",
-                "Unknown"
-            ),
-
-            packet.get(
-                "process",
-                "Unknown"
-            ),
-        ]
-
-        # ------------------------------------------------------
-        # INSERT DATA
-        # ------------------------------------------------------
-
-        for column, value in enumerate(
-            values
-        ):
-
-            item = QTableWidgetItem(
-                str(value)
-            )
-
-            item.setTextAlignment(
-                Qt.AlignCenter
-            )
-
-            self.packet_table.setItem(
-                row,
-                column,
-                item
-            )
-
-        # Scroll to newest packet.
-        self.packet_table.scrollToBottom()
+        table.scrollToBottom()
 
     # ==========================================================
     # CLEAR PACKETS
@@ -1982,3 +1812,231 @@ class DashboardPage(QWidget):
         self.packet_table.setRowCount(
             0
         )
+
+    # ==========================================================
+    # LIVE NETWORK INTEGRATION
+    # ==========================================================
+
+    def rescan_adapters(self):
+        """Refresh adapter information and give visible feedback."""
+        self.refresh_adapter_info()
+
+        button = getattr(self, "rescan_button", None)
+        if button is not None:
+            button.setText("✓ Scan Complete")
+            button.setEnabled(False)
+            QTimer.singleShot(1200, self._restore_rescan_button)
+
+    def _restore_rescan_button(self):
+        button = getattr(self, "rescan_button", None)
+        if button is not None:
+            button.setText("⟳  Rescan Adapters")
+            button.setEnabled(True)
+
+    def refresh_adapter_info(self):
+        """Read live interface details and prefer the active Wi-Fi adapter."""
+        if psutil is None:
+            self._set_adapter_text("name", "Network adapter")
+            self._set_adapter_text("description", "psutil is not installed")
+            self._set_adapter_text("status", "●  Dependency missing")
+            for key in ("IPv4 Address", "IPv6 Address", "MAC Address", "Status"):
+                self._set_adapter_text(key, "—")
+            return
+
+        try:
+            stats = psutil.net_if_stats()
+            addresses = psutil.net_if_addrs()
+            candidates = []
+
+            for name, addr_list in addresses.items():
+                stat = stats.get(name)
+                if not stat or not stat.isup:
+                    continue
+
+                ipv4 = next(
+                    (
+                        address.address
+                        for address in addr_list
+                        if address.family == socket.AF_INET
+                        and not address.address.startswith("127.")
+                        and not address.address.startswith("169.254.")
+                    ),
+                    "",
+                )
+                if ipv4:
+                    candidates.append((name, addr_list, stat, ipv4))
+
+            if not candidates:
+                self._set_adapter_text("name", "No active adapter")
+                self._set_adapter_text("description", "No active IPv4 interface detected")
+                self._set_adapter_text("status", "●  Disconnected")
+                for key in ("IPv4 Address", "IPv6 Address", "MAC Address", "Status"):
+                    self._set_adapter_text(key, "—")
+                return
+
+            # Prefer Wi-Fi if it is active; otherwise use the first active
+            # adapter with a usable IPv4 address (excluding APIPA/loopback).
+            selected = next(
+                (item for item in candidates if item[0].lower() == "wi-fi"),
+                candidates[0],
+            )
+            name, addr_list, stat, ipv4 = selected
+
+            # Prefer a global IPv6 address. If the adapter only has a
+            # link-local address (common on Windows), display that instead.
+            ipv6_addresses = [
+                address.address.split("%", 1)[0]
+                for address in addr_list
+                if address.family == socket.AF_INET6
+                and address.address != "::1"
+                and not address.address.startswith("::ffff:127.")
+            ]
+            ipv6 = next(
+                (address for address in ipv6_addresses if not address.lower().startswith("fe80:")),
+                ipv6_addresses[0] if ipv6_addresses else "N/A",
+            )
+            mac = next(
+                (
+                    address.address
+                    for address in addr_list
+                    if getattr(psutil, "AF_LINK", object()) == address.family
+                ),
+                "—",
+            )
+
+            self._set_adapter_text("name", name)
+            self._set_adapter_text(
+                "description",
+                f"Speed: {stat.speed} Mbps · Updated {datetime.now().strftime('%H:%M:%S')}"
+                if stat.speed
+                else f"Active network interface · Updated {datetime.now().strftime('%H:%M:%S')}",
+            )
+            # "Online" means this adapter can reach an external network.
+            # Interface-up alone is not enough to prove Internet connectivity.
+            is_online = self._can_reach_external_network()
+            connection_status = "●  Online" if is_online else "●  Offline"
+
+            self._set_adapter_text("status", connection_status)
+            self._set_adapter_text("IPv4 Address", ipv4)
+            self._set_adapter_text("IPv6 Address", ipv6)
+            self._set_adapter_text("MAC Address", mac)
+            self._set_adapter_text("Status", "Online" if is_online else "Offline")
+
+            status_label = self._adapter_labels.get("Status")
+            if status_label is not None:
+                status_label.setStyleSheet(
+                    "color: #00E676; font-weight: 700;" if is_online
+                    else "color: #FF3B4E; font-weight: 700;"
+                )
+            header_status = self._adapter_labels.get("status")
+            if header_status is not None:
+                header_status.setStyleSheet(
+                    "color: #00E676; font-weight: 700;" if is_online
+                    else "color: #FF3B4E; font-weight: 700;"
+                )
+
+        except Exception as exc:
+            self._set_adapter_text("description", f"Adapter read error: {exc}")
+            self._set_adapter_text("status", "●  Scan failed")
+
+    def _can_reach_external_network(self):
+        """Return True if a TCP connection to a public endpoint succeeds.
+
+        This checks external network reachability, not just whether the
+        Windows network adapter is switched on. A restrictive firewall or
+        proxy can cause a false Offline result even when another route works.
+        """
+        endpoints = (("1.1.1.1", 443), ("8.8.8.8", 443))
+        for host, port in endpoints:
+            try:
+                with socket.create_connection((host, port), timeout=1.0):
+                    return True
+            except OSError:
+                continue
+        return False
+
+    def _set_adapter_text(self, key, value):
+        label = self._adapter_labels.get(key)
+        if label is not None:
+            label.setText(str(value))
+
+    def refresh_live_statistics(self):
+        """Refresh real OS connection counts; does not fabricate packet rows."""
+        if psutil is None:
+            for label in self._connection_labels.values():
+                label.setText("N/A")
+            return
+        counts = {"ESTABLISHED": 0, "LISTENING": 0, "TIME_WAIT": 0, "TCP": 0, "UDP": 0, "CLOSE_WAIT": 0}
+        try:
+            for conn in psutil.net_connections(kind="inet"):
+                kind = getattr(conn, "type", None)
+                if kind == socket.SOCK_STREAM:
+                    counts["TCP"] += 1
+                elif kind == socket.SOCK_DGRAM:
+                    counts["UDP"] += 1
+                status = str(getattr(conn, "status", "")).upper()
+                if status in counts:
+                    counts[status] += 1
+            for name, label in self._connection_labels.items():
+                label.setText(str(counts.get(name, 0)))
+        except (psutil.AccessDenied, PermissionError):
+            for label in self._connection_labels.values():
+                label.setText("Access denied")
+        except Exception:
+            for label in self._connection_labels.values():
+                label.setText("N/A")
+
+    def start_capture(self):
+        if self.capture_worker is not None and self.capture_worker.isRunning():
+            return
+        if sniff is None:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Packet capture unavailable", "Scapy is not installed. Run: python -m pip install scapy\n\nOn Windows, install Npcap and run the application with suitable permissions to capture packets.")
+            return
+        self.capture_worker = PacketCaptureWorker()
+        self.capture_worker.packets_received.connect(self._on_live_packets)
+        self.capture_worker.capture_error.connect(self._on_capture_error)
+        self.capture_worker.finished.connect(self._on_capture_finished)
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self.capture_status_label.setText("●  Packet Capturing...")
+        self.capture_status_label.show()
+        self.capture_worker.start()
+
+    def stop_capture(self):
+        if self.capture_worker is not None and self.capture_worker.isRunning():
+            self.capture_worker.stop()
+            self.capture_worker.requestInterruption()
+        self.capture_status_label.hide()
+        self.stop_button.setEnabled(False)
+        self.start_button.setEnabled(True)
+
+    def _on_live_packet(self, packet):
+        """Compatibility slot for callers that provide one packet."""
+        self._on_live_packets([packet])
+
+    def _on_live_packets(self, packets):
+        """Process captured packets in batches to keep the UI responsive."""
+        if not packets:
+            return
+
+        self.add_packets(packets)
+        self.update_protocol_statistics_batch(
+            packet.get("protocol", "") for packet in packets
+        )
+        self.total_packets += len(packets)
+        self.incoming_packets += sum(1 for packet in packets if packet.get("direction") == "IN")
+        self.outgoing_packets += sum(1 for packet in packets if packet.get("direction") == "OUT")
+        self.update_metrics(self.total_packets, self.incoming_packets, self.outgoing_packets)
+
+    def _on_capture_error(self, message):
+        from PySide6.QtWidgets import QMessageBox
+        self.capture_status_label.hide()
+        self.stop_button.setEnabled(False)
+        self.start_button.setEnabled(True)
+        QMessageBox.warning(self, "Capture error", f"Packet capture could not start or stopped unexpectedly:\n{message}\n\nCheck Npcap installation and run with suitable permissions.")
+
+    def _on_capture_finished(self):
+        self.capture_status_label.hide()
+        self.stop_button.setEnabled(False)
+        self.start_button.setEnabled(True)

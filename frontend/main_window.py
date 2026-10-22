@@ -4,6 +4,11 @@
 # ============================================================
 
 from PySide6.QtCore import Qt
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -105,30 +110,6 @@ class MainWindow(QMainWindow):
         # Content
 
         self.stack = QStackedWidget()
-
-        
-        # Fix white background behind stacked pages
-        self.stack.setObjectName("MainContentStack")
-        self.stack.setAutoFillBackground(True)
-
-        stack_palette = self.stack.palette()
-        stack_palette.setColor(
-            stack_palette.ColorRole.Window,
-            Qt.GlobalColor.black
-        )
-        stack_palette.setColor(
-            stack_palette.ColorRole.Base,
-            Qt.GlobalColor.black
-        )
-        self.stack.setPalette(stack_palette)
-
-        self.stack.setStyleSheet("""
-            QStackedWidget#MainContentStack {
-                background-color: #0B1120;
-                border: none;
-            }
-        """)
-
 
         self.dashboard_page = DashboardPage()
 
@@ -371,31 +352,47 @@ class MainWindow(QMainWindow):
             adapter_title
         )
 
-        adapters = [
-            "● Wi-Fi",
-            "○ Ethernet",
-            "○ Bluetooth",
-            "○ VMware Network",
-            "○ VirtualBox Host-Only",
-            "○ vEthernet (WSL)",
-            "○ vEthernet (Default Switch)",
-            "○ Npcap Loopback",
-            "○ TAP-Windows Adapter",
-        ]
+        # Show adapters detected on THIS computer, not a hardcoded list.
+        # Hide virtual/tunnel/loopback interfaces from the sidebar so it
+        # focuses on physical/local network adapters such as Wi-Fi/Ethernet.
+        self.adapter_labels = []
+        virtual_markers = (
+            "vmware", "virtualbox", "vmnet", "veth", "hyper-v",
+            "wsl", "npcap", "loopback", "tap-windows", "teredo",
+            "isatap", "6to4", "pseudo-interface", "bluetooth device",
+        )
 
-        for adapter in adapters:
+        adapter_names = []
+        if psutil is not None:
+            try:
+                addresses = psutil.net_if_addrs()
+                stats = psutil.net_if_stats()
+                for adapter_name in addresses:
+                    lowered = adapter_name.lower()
+                    if any(marker in lowered for marker in virtual_markers):
+                        continue
+                    # Only show an interface that has an IPv4/IPv6 or MAC address.
+                    has_network_address = any(
+                        getattr(addr, "address", "")
+                        for addr in addresses[adapter_name]
+                    )
+                    if has_network_address:
+                        adapter_names.append((adapter_name, bool(stats.get(adapter_name) and stats[adapter_name].isup)))
+            except Exception:
+                adapter_names = []
 
-            label = QLabel(
-                adapter
-            )
-
-            label.setObjectName(
-                "AdapterItem"
-            )
-
-            layout.addWidget(
-                label
-            )
+        if not adapter_names:
+            empty_label = QLabel("No physical adapters detected")
+            empty_label.setObjectName("AdapterItem")
+            layout.addWidget(empty_label)
+        else:
+            for adapter_name, is_up in adapter_names:
+                indicator = "●" if is_up else "○"
+                label = QLabel(f"{indicator} {adapter_name}")
+                label.setObjectName("AdapterItem")
+                label.setToolTip("Interface is up" if is_up else "Interface is down")
+                layout.addWidget(label)
+                self.adapter_labels.append(label)
 
         layout.addStretch()
 
